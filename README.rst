@@ -1,1 +1,1 @@
-Python Coalescence Microseismic Mapping Library
+Python Coalescence Microseismic Scanning Library
