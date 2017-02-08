@@ -18,9 +18,9 @@ c_i64Pt = clib.ndpointer(dtype=np.int64, flags="C_CONTIGUOUS")
 c_iPt = clib.ndpointer(dtype=np.int32, flags="C_CONTIGUOUS")
 
 if os.name == 'nt':
-    _cmslib = clib.load_library(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../cmslib.dll'), '.')
+    _cmslib = clib.load_library(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib/cmslib.dll'), '.')
 else:  # posix
-    _cmslib = clib.load_library(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../cmslib.so'), '.')
+    _cmslib = clib.load_library(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib/cmslib.so'), '.')
 
 _cmslib.onset.argtypes = [c_dPt, c_int, c_int, c_int, c_int, c_dPt]
 _cmslib.onset_mp.argtypes = [c_dPt, c_int, c_int, c_int, c_int, c_int, c_dPt]
