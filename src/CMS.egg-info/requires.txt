@@ -1,0 +1,7 @@
+numpy
+pandas
+pyproj
+matplotlib
+vispy
+pyzmq
+msgpack-python
