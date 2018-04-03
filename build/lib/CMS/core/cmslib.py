@@ -36,3 +36,92 @@ def onset(env, stw, ltw, gap):
     else:
         _cmslib.onset(env, nsamp, int(stw), int(ltw), int(gap), out)
         return out
+
+
+_cmslib.levinson.argtypes = [c_dPt, c_int, c_dPt, c_dPt, c_dPt, c_dPt]
+_cmslib.levinson_mp.argtypes = [c_dPt, c_int, c_int, c_int, c_dPt, c_dPt, c_dPt, c_dPt]
+_cmslib.nlevinson.argtypes = [c_dPt, c_int, c_dPt, c_dPt]
+_cmslib.nlevinson_mp.argtypes = [c_dPt, c_int, c_int, c_dPt, c_dPt]
+
+
+def levinson(acc, order, return_error=False):
+    acc = np.array(acc, dtype=np.double)
+    if acc.ndim > 1:
+        nsamp = acc.shape[-1]
+        nchan = acc[..., 0].size
+        chan = acc.shape[:-1]
+        a = np.zeros(chan + (order+1,), dtype=np.double)
+        e = np.zeros(chan, dtype=np.double)
+        k = np.zeros(chan + (order,), dtype=np.double)
+        tmp = np.zeros(chan + (order,), dtype=np.double)
+        _cmslib.levinson_mp(acc, nchan, nsamp, order, a,
+                          e, k, tmp)
+    else:
+        nsamp = acc.shape[-1]
+        order = min(order, nsamp-1)
+        a = np.zeros(order+1, dtype=np.double)
+        e = np.zeros(1, dtype=np.double)
+        k = np.zeros(order, dtype=np.double)
+        tmp = np.zeros(order, dtype=np.double)
+        _cmslib.levinson(acc, order, a,
+                       e, k, tmp)
+    if return_error:
+        return a, k, e
+    else:
+        return a, k
+
+
+def nlevinson(acc):
+    acc = np.array(acc, dtype=np.double)
+    if acc.ndim > 1:
+        nsamp = acc.shape[-1]
+        nchan = acc[..., 0].size
+        a = np.zeros(acc.shape, dtype=np.double)
+        tmp = np.zeros(acc.shape, dtype=np.double)
+        _cmslib.nlevinson_mp(acc, nchan, nsamp,
+                           a, tmp)
+    else:
+        nsamp = acc.shape[-1]
+        a = np.zeros(nsamp, dtype=np.double)
+        tmp = np.zeros(nsamp, dtype=np.double)
+        _cmslib.nlevinson(acc, nsamp,
+                        a, tmp)
+    return a
+
+
+
+
+_cmslib.scan4d.argtypes = [c_dPt,  c_i32Pt, c_dPt,c_int32, c_int32, c_int32, c_int32, c_int64, c_int64]
+_cmslib.detect4d.argtypes = [c_dPt, c_dPt,c_i64Pt,c_int32, c_int32, c_int32, c_int64, c_int64]
+_cmslib.detect4d_t.argtypes = [c_dPt, c_dPt, c_i64Pt,c_int32, c_int32, c_int32, c_int64, c_int64]
+
+def scan(sig, tt, fsmp, lsmp, map4d,threads):
+    nstn, nsamp = sig.shape
+    if not tt.shape[-1] == nstn:
+        raise ValueError('Mismatch between number of stations for data and LUT, {} - {}.'.format(
+            nstn, tt.shape[-1]))
+    ncell = tt.shape[:-1]
+    tcell = np.prod(ncell)
+    if map4d.size < nsamp*tcell:
+        raise ValueError('4D-Array is too small.')
+    _cmslib.scan4d(sig, tt, map4d, c_int32(fsmp), c_int32(lsmp),
+                 c_int32(nsamp), c_int32(nstn),  c_int64(tcell), c_int64(threads))
+
+
+def detect(mmap, dsnr, dind, fsmp, lsmp, threads):
+    nsamp = mmap.shape[-1]
+    ncell = np.prod(mmap.shape[:-1])
+    if dsnr.size < nsamp or dind.size < nsamp:
+        raise ValueError('Ouput array size too small, sample count = {}.'.format(nsamp))
+    _cmslib.detect4d(mmap, dsnr, dind, c_int32(fsmp), c_int32(lsmp),
+                   c_int32(nsamp), c_int64(ncell), c_int64(threads))
+
+
+def detect_t(mmap, dsnr, dind, fsmp, lsmp, threads):
+    nsamp = mmap.shape[0]
+    ncell = np.prod(mmap.shape[1:])
+    if dsnr.size < nsamp or dind.size < nsamp:
+        raise ValueError('Ouput array size too small, sample count = {}.'.format(nsamp))
+    _cmslib.detect4d_t(mmap, dsnr, dind, c_int32(fsmp), c_int32(lsmp),
+                     c_int32(nsamp), c_int64(ncell), c_int64(threads))
+

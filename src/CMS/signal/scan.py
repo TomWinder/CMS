@@ -344,6 +344,8 @@ class SeisPlot:
         # ---------------- Plotting the Traces -----------
         STIn = np.where(self.times == self.EVENT['DT'].iloc[0])[0][0]
         ENIn = np.where(self.times == self.EVENT['DT'].iloc[-1])[0][0]
+
+        print(STIn,ENIn,indexVal)
         for ii in range(self.DATA.signal.shape[1]): 
             if self.FilteredSignal == False:
                     Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[0,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[0,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'r',linewidth=0.5)
@@ -355,7 +357,9 @@ class SeisPlot:
                     Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[2,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[2,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'g',linewidth=0.5)
 
         # ---------------- Plotting the Station Travel Times -----------
+        print(self.LUT.get_value_at('TIME_P',np.array([indexVal])))
         for i in range(self.LUT.get_value_at('TIME_P',np.array([indexVal]))[0].shape[0]):
+            print(i)
             tp = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_P',np.array([indexVal]))[0][i])))/timedelta(seconds=1)))
             ts = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_S',np.array([indexVal]))[0][i])))/timedelta(seconds=1)))
 
