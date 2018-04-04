@@ -1065,8 +1065,8 @@ class SeisScan:
         SNR_P = self.DATA.SNR_P
         SNR_S = self.DATA.SNR_S
 
-        ttp = self.lookup_table.value_at('TIME_P', self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()])))[0]
-        tts = self.lookup_table.value_at('TIME_S', self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()])))[0]
+        ttp = self.lookup_table.value_at('TIME_P', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()]))).astype(int))[0]
+        tts = self.lookup_table.value_at('TIME_S', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()]))).astype(int))[0]
 
 
 
@@ -1204,7 +1204,7 @@ class SeisScan:
 
             self._map = None
             daten, dsnr, dloc, MAP = self._compute(cstart,cend,self.DATA.signal,self.DATA.station_avaliability)
-            dcoord = self.lookup_table.xyz2coord(dloc)
+            dcoord = self.lookup_table.xyz2coord(np.array(dloc).astype(int))
             EventCoaVal = pd.DataFrame(np.array((daten,dsnr,dcoord[:,0],dcoord[:,1],dcoord[:,2])).transpose(),columns=['DT','COA','X','Y','Z'])
             EventCoaVal['DT'] = pd.to_datetime(EventCoaVal['DT'])
 
