@@ -324,7 +324,7 @@ class SeisPlot:
 
         TimeSlice = self.times[TimeSliceIndex]
         index = np.where(self.EVENT['DT'] == TimeSlice)[0][0]
-        indexVal = self.LUT.xyz2loc(self.LUT.coord2xyz(np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]]))[0])
+        indexVal = np.array(self.LUT.xyz2loc(self.LUT.coord2xyz(np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]]))[0])).astype(int)
         indexCoord = np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]])[0,:]
 
 
@@ -339,13 +339,10 @@ class SeisPlot:
         Coa_CoaVal   =  plt.subplot2grid((3, 5), (2, 3), colspan=2)
 
 
-
-
         # ---------------- Plotting the Traces -----------
         STIn = np.where(self.times == self.EVENT['DT'].iloc[0])[0][0]
         ENIn = np.where(self.times == self.EVENT['DT'].iloc[-1])[0][0]
 
-        print(STIn,ENIn,indexVal)
         for ii in range(self.DATA.signal.shape[1]): 
             if self.FilteredSignal == False:
                     Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[0,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[0,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'r',linewidth=0.5)
@@ -357,9 +354,7 @@ class SeisPlot:
                     Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[2,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[2,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'g',linewidth=0.5)
 
         # ---------------- Plotting the Station Travel Times -----------
-        print(self.LUT.get_value_at('TIME_P',np.array([indexVal])))
         for i in range(self.LUT.get_value_at('TIME_P',np.array([indexVal]))[0].shape[0]):
-            print(i)
             tp = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_P',np.array([indexVal]))[0][i])))/timedelta(seconds=1)))
             ts = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_S',np.array([indexVal]))[0][i])))/timedelta(seconds=1)))
 
@@ -398,7 +393,6 @@ class SeisPlot:
 
 
         #  ------------- Plotting the Coalescence Value Slices -----------
-        print(self.MAPmax)
         gridX,gridY = np.mgrid[min(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,0]):max(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,0]):(max(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,0]) - min(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,0]))/self.LUT.cell_count[0], min(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,1]):max(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,1]):(max(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,1]) - min(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,1]))/self.LUT.cell_count[1]]
         self.CoaXYPlt = Coa_XYSlice.pcolormesh(gridX,gridY,self.MAP[:,:,int(indexVal[2]),int(TimeSliceIndex-STIn)]/self.MAPmax,vmin=0,vmax=1,cmap=self.CMAP)
         Coa_XYSlice.set_xlim([min(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,0]),max(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,0])])
@@ -446,7 +440,7 @@ class SeisPlot:
         STIn = np.where(self.times == self.EVENT['DT'].iloc[0])[0][0]
         TimeSlice  = self.times[int(frame)]
         index      = np.where(self.EVENT['DT'] == TimeSlice)[0][0]
-        indexVal = self.LUT.xyz2loc(self.LUT.coord2xyz(np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]]))[0])
+        indexVal = np.array(self.LUT.xyz2loc(self.LUT.coord2xyz(np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]]))[0])).astype(int)
         indexCoord = np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]])[0,:]
 
         # Updating the Coalescence Value and Trace Lines
@@ -1119,7 +1113,6 @@ class SeisScan:
         #samples_weights = np.zeros(np.product(np.shape(COA3D)), dtype=float)
 
         # Get point sample coords and weights:
-        print(COA3D.shape)
         samples_weights = COA3D.flatten()
 
         lc = self.lookup_table.cell_count
@@ -1127,9 +1120,6 @@ class SeisScan:
         x_samples      = lx.flatten()*self.lookup_table.cell_size[0]
         y_samples      = ly.flatten()*self.lookup_table.cell_size[1]
         z_samples      = lz.flatten()*self.lookup_table.cell_size[2]
-
-        print(x_samples.shape)
-        print(samples_weights.shape) 
 
         SumSW = np.sum(samples_weights)
 
@@ -1244,7 +1234,6 @@ class SeisScan:
             EVENT['ErrY'] = LOC_ERR[1]
             EVENT['ErrZ'] = LOC_ERR[2]
 
-            #print(EVENT)
             
             self.output.write_event(EVENT,EVENTS['EventID'].iloc[e])
 
