@@ -98,7 +98,7 @@ EXPORT void detect4d_t(double *mapPt, double *snrPt, int64_t *indPt, int32_t fsm
 
 	/* stack data.... */
 
-	omp_set_num_threads(threads)
+	omp_set_num_threads(threads);
 
 	#pragma omp parallel for private(cell,tm,mv,ix,cv,rPt) /* shared(mapPt) */
 	for (tm=fsmp; tm<lsmp; tm++)
