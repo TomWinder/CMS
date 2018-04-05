@@ -333,10 +333,33 @@ class Grid3D:
     def loc2coord(self,loc):
         return self.xyz2coord(self.loc2xyz(loc))
 
+    def coord2loc(self,loc):
+        return self.xyz2loc(self.coord2xyz(loc))
+
 
     def coord2xyz(self, loc):
         X, Y = self.lonlat2xy(loc[:,0], loc[:,1])
-        return np.array([X, Y, loc[:,2]]).transpose()
+        Z = loc[:,2]
+
+        Bounds = self.get_grid_xyz()
+        Xmin,Ymin,Zmin = np.min(Bounds,axis=0)
+        Xmax,Ymax,Zmax = np.max(Bounds,axis=0)
+
+
+        if X < Xmin:
+            X = np.array([Xmin + self._cell_size[0]/2])
+        if X > Xmax:
+            X = np.array([Xmax - self._cell_size[0]/2])
+        if Y < Ymin:
+            Y = np.array([Ymin + self._cell_size[1]/2])
+        if Y >  Ymax:
+            Y = np.array([Ymax - self._cell_size[1]/2])
+        if Z < Zmin:
+            Z = np.array([Zmin + self._cell_size[2]/2])
+        if Z > Zmax:
+            Z = np.array([Zmax - self._cell_size[2]/2])
+
+        return np.array([X,Y,Z]).transpose()
 
     def coord2index(self,coord):
         return self.loc2index(self.coord2loc(coord))

@@ -428,10 +428,13 @@ class SeisPlot:
 
 
         #  ------------- Plotting the station Locations -----------
-        Coa_Logo.axis('off')
-        im = mpimg.imread(self.logoPath)
-        Coa_Logo.imshow(im)
-        Coa_Logo.text(150, 200, r'CoalescenceVideo', fontsize=14,style='italic')
+        try:
+            Coa_Logo.axis('off')
+            im = mpimg.imread(self.logoPath)
+            Coa_Logo.imshow(im)
+            Coa_Logo.text(150, 200, r'CoalescenceVideo', fontsize=14,style='italic')
+        except:
+            'Logo not plotting'
 
         return fig
 
@@ -634,11 +637,13 @@ class SeisPlot:
 
 
         # Plotting the logo
-        Coa_Logo.axis('off')
-        im = mpimg.imread(self.logoPath)
-        Coa_Logo.imshow(im)
-        Coa_Logo.text(150, 200, r'Earthquake Location Error', fontsize=10,style='italic')
-
+        try:
+            Coa_Logo.axis('off')
+            im = mpimg.imread(self.logoPath)
+            Coa_Logo.imshow(im)
+            Coa_Logo.text(150, 200, r'Earthquake Location Error', fontsize=10,style='italic')
+        except:
+            'Logo not plotting'
 
         if SaveFilename == None:
             plt.show()
@@ -1068,7 +1073,7 @@ class SeisScan:
         ttp = self.lookup_table.value_at('TIME_P', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()]))).astype(int))[0]
         tts = self.lookup_table.value_at('TIME_S', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()]))).astype(int))[0]
 
-
+        print(ttp)
 
         # Determining the stations that can be picked on and the phasese
         STATIONS=pd.DataFrame(columns=['Name','Phase','Pick','PickError'])

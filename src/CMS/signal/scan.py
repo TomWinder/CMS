@@ -324,7 +324,7 @@ class SeisPlot:
 
         TimeSlice = self.times[TimeSliceIndex]
         index = np.where(self.EVENT['DT'] == TimeSlice)[0][0]
-        indexVal = np.array(self.LUT.xyz2loc(self.LUT.coord2xyz(np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]]))[0])).astype(int)
+        indexVal = self.LUT.coord2loc(np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]])).astype(int)[0]
         indexCoord = np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]])[0,:]
 
 
@@ -428,19 +428,23 @@ class SeisPlot:
 
 
         #  ------------- Plotting the station Locations -----------
-        Coa_Logo.axis('off')
-        im = mpimg.imread(self.logoPath)
-        Coa_Logo.imshow(im)
-        Coa_Logo.text(150, 200, r'CoalescenceVideo', fontsize=14,style='italic')
+        try:
+            Coa_Logo.axis('off')
+            im = mpimg.imread(self.logoPath)
+            Coa_Logo.imshow(im)
+            Coa_Logo.text(150, 200, r'CoalescenceVideo', fontsize=14,style='italic')
+        except:
+            'Logo not plotting'
 
         return fig
 
 
     def _CoalescenceVideo_update(self,frame):
+        frame = int(frame)
         STIn = np.where(self.times == self.EVENT['DT'].iloc[0])[0][0]
         TimeSlice  = self.times[int(frame)]
         index      = np.where(self.EVENT['DT'] == TimeSlice)[0][0]
-        indexVal = np.array(self.LUT.xyz2loc(self.LUT.coord2xyz(np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]]))[0])).astype(int)
+        indexVal = self.LUT.coord2loc(np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]])).astype(int)[0]
         indexCoord = np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]])[0,:]
 
         # Updating the Coalescence Value and Trace Lines
@@ -448,9 +452,9 @@ class SeisPlot:
         self.CoaValVLINE.set_xdata(TimeSlice)
 
         # Updating the Coalescence Maps
-        self.CoaXYPlt.set_array((self.MAP[:,:,int(indexVal[2]),int(frame-STIn)]/self.MAPmax)[:-1,:-1].ravel())
-        self.CoaYZPlt.set_array((self.MAP[:,int(indexVal[1]),:,int(frame-STIn)]/self.MAPmax)[:-1,:-1].ravel())
-        self.CoaXZPlt.set_array((np.transpose(self.MAP[int(indexVal[0]),:,:,int(frame-STIn)])/self.MAPmax)[:-1,:-1].ravel())
+        self.CoaXYPlt.set_array((self.MAP[:,:,indexVal[2],int(STIn-frame)]/self.MAPmax)[:-1,:-1].ravel())
+        self.CoaYZPlt.set_array((self.MAP[:,indexVal[1],:,int(STIn-frame)]/self.MAPmax)[:-1,:-1].ravel())
+        self.CoaXZPlt.set_array((np.transpose(self.MAP[indexVal[0],:,:,int(STIn-frame)])/self.MAPmax)[:-1,:-1].ravel())
 
         # Updating the Coalescence Lines
         self.CoaXYPlt_VLINE.set_xdata(indexCoord[0])
@@ -462,9 +466,7 @@ class SeisPlot:
 
 
         # Updating the station travel-times
-
         for i in range(self.LUT.get_value_at('TIME_P',np.array([indexVal]))[0].shape[0]):
-
             try:
                 tp = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_P',np.array([indexVal]))[0][i])))/timedelta(seconds=1)))
                 ts = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_S',np.array([indexVal]))[0][i])))/timedelta(seconds=1)))
@@ -512,9 +514,8 @@ class SeisPlot:
         writer = Writer(fps=4, metadata=dict(artist='Ulvetanna'), bitrate=1800)
 
 
-
         FIG = self.CoalescenceImage(STIn)
-        ani = animation.FuncAnimation(FIG, self._CoalescenceVideo_update, frames=np.arange(STIn,ENIn,int(self.DATA.sampling_rate/20)),blit=False,repeat=False) 
+        ani = animation.FuncAnimation(FIG, self._CoalescenceVideo_update, frames=np.linspace(STIn,ENIn-1,200),blit=False,repeat=False) 
 
         if SaveFilename == None:
             plt.show()
@@ -634,11 +635,13 @@ class SeisPlot:
 
 
         # Plotting the logo
-        Coa_Logo.axis('off')
-        im = mpimg.imread(self.logoPath)
-        Coa_Logo.imshow(im)
-        Coa_Logo.text(150, 200, r'Earthquake Location Error', fontsize=10,style='italic')
-
+        try:
+            Coa_Logo.axis('off')
+            im = mpimg.imread(self.logoPath)
+            Coa_Logo.imshow(im)
+            Coa_Logo.text(150, 200, r'Earthquake Location Error', fontsize=10,style='italic')
+        except:
+            'Logo not plotting'
 
         if SaveFilename == None:
             plt.show()
@@ -1067,9 +1070,6 @@ class SeisScan:
 
         ttp = self.lookup_table.value_at('TIME_P', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()]))).astype(int))[0]
         tts = self.lookup_table.value_at('TIME_S', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()]))).astype(int))[0]
-
-
-
         # Determining the stations that can be picked on and the phasese
         STATIONS=pd.DataFrame(columns=['Name','Phase','Pick','PickError'])
         for s in range(len(SNR_P)):
@@ -1160,7 +1160,7 @@ class SeisScan:
         CoaMap = np.log(np.sum(np.exp(Map4D),axis=-1))
         CoaMap = CoaMap/np.max(CoaMap)
 
-        CoaMap_Cutoff = np.percentile(CoaMap,95)
+        CoaMap_Cutoff = 0.8
         CoaMap[CoaMap < CoaMap_Cutoff] = CoaMap_Cutoff 
         CoaMap = CoaMap - CoaMap_Cutoff 
         CoaMap = CoaMap/np.max(CoaMap)
@@ -1209,8 +1209,6 @@ class SeisScan:
             EventCoaVal['DT'] = pd.to_datetime(EventCoaVal['DT'])
 
             EVENT = EventCoaVal.sort_values(by=['COA'],ascending=False).iloc[0]
-
-            pickle.dump(self.DATA,open("ONSET.p", "wb" ))
 
             self.MAP = MAP
             self.EVENT = EVENT
