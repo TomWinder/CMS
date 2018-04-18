@@ -1052,10 +1052,14 @@ class SeisScan:
         try:
             popt, pcov = curve_fit(gaussian_func, x_data, y_data, p0) # Fit gaussian to data
             sigma = np.absolute(popt[2]) # Get standard deviation from gaussian fit
+
+            # Mean is popt[1]. x_data[0] + popt[1] (In seconds)
+            mean = cstart + timedelta(seconds=float(popt[1] + x_data[0]))
         except:
             sigma = -1
+            mean  = -1
 
-        return sigma
+        return sigma,mean
 
 
 
@@ -1071,17 +1075,17 @@ class SeisScan:
         ttp = self.lookup_table.value_at('TIME_P', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()]))).astype(int))[0]
         tts = self.lookup_table.value_at('TIME_S', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()]))).astype(int))[0]
         # Determining the stations that can be picked on and the phasese
-        STATIONS=pd.DataFrame(columns=['Name','Phase','Pick','PickError'])
+        STATIONS=pd.DataFrame(columns=['Name','Phase','ModelledTime','PickTime','PickError'])
         for s in range(len(SNR_P)):
             if np.nansum(SNR_P[s]) !=  0:
                 stationEventPT = EVENT_MaxCoa['DT'] + timedelta(seconds=ttp[s])
 
                 if self.PickingType == 'Gaussian':
-                    Err = self._GaussianTrigger(SNR_P[s],'P',self.DATA.startTime,stationEventPT.to_pydatetime())
+                    Err,Mn = self._GaussianTrigger(SNR_P[s],'P',self.DATA.startTime,stationEventPT.to_pydatetime())
 
 
                 
-                tmpSTATION = pd.DataFrame([[self.lookup_table.station_data['Name'][s],'P',stationEventPT,Err]],columns=['Name','Phase','Pick','PickError'])
+                tmpSTATION = pd.DataFrame([[self.lookup_table.station_data['Name'][s],'P',stationEventPT,Mn,Err]],columns=['Name','Phase','ModelledTime','PickTime','PickError'])
                 STATIONS = STATIONS.append(tmpSTATION)
 
             if np.nansum(SNR_S[s]) != 0:
@@ -1089,9 +1093,9 @@ class SeisScan:
                 stationEventST = EVENT_MaxCoa['DT'] + timedelta(seconds=tts[s])
 
                 if self.PickingType == 'Gaussian':
-                    Err = self._GaussianTrigger(SNR_P[s],'S',self.DATA.startTime,stationEventPT.to_pydatetime())
+                    Err,Mn = self._GaussianTrigger(SNR_P[s],'S',self.DATA.startTime,stationEventPT.to_pydatetime())
 
-                tmpSTATION = pd.DataFrame([[self.lookup_table.station_data['Name'][s],'S',stationEventST,Err]],columns=['Name','Phase','Pick','PickError'])
+                tmpSTATION = pd.DataFrame([[self.lookup_table.station_data['Name'][s],'S',stationEventST,Mn,Err]],columns=['Name','Phase','ModelledTime','PickTime','PickError'])
                 STATIONS = STATIONS.append(tmpSTATION)
 
         #print(STATIONS)
