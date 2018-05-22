@@ -715,9 +715,6 @@ class LUT(Grid3D,NonLinLoc):
         self.maps = {'TIME_P': map_p1, 'TIME_S': map_s1}
 
 
-
-
-
     def compute_1DVelocity(self,Z,VP,VS):
         '''
             Function used to compute Travel-time tables in a 1D Velocity model
@@ -733,27 +730,29 @@ class LUT(Grid3D,NonLinLoc):
         #      Interpolating the velocity model to each point in the 3D grid. Defined Smoothing parameter based by
 
 
+
         stn = self.get_station_xyz()
         coord = self.get_grid_xyz()
         ix, iy, iz = self.get_grid_xyz(cells='all')
-        ttp = np.zeros(ix.shape + (nstn,))
-        tts = np.zeros(ix.shape + (nstn,))
+        ttp = np.zeros(ix.shape + (stn.shape[0],))
+        tts = np.zeros(ix.shape + (stn.shape[0],))
 
         gvp = np.interp(iz, -Z, VP)
         gvs = np.interp(iz, -Z, VS)
 
-
         for s in range(stn.shape[0]):
-            print("Generating 1D Travel-Time Table - {}".format(i))
+            print("Generating 1D Travel-Time Table - {} of {}".format(s+1,stn.shape[0]))
 
             x = np.arange(min(coord[:,0]),max(coord[:,0]),self.cell_size[0])
             y = np.arange(min(coord[:,1]),max(coord[:,1]),self.cell_size[1])
-            Z = np.arange(min(coord[:,2]),max(coord[:,2]),self.cell_size[2])
+            z = np.arange(min(coord[:,2]),max(coord[:,2]),self.cell_size[2])
 
-            ttp[..., p] = eikonal(x,y,z,gvp,np.array([s]))[0]
+            print(eikonal(x,y,z,gvp,np.array([s])))
+
+            ttp[..., s] = eikonal(x,y,z,gvp,np.array([s]))[0]
             tts[..., s] = eikonal(x,y,z,gvs,np.array([s]))[0]
 
-        self.maps = {'TIME_P': ttp1, 'TIME_S': tts}
+        self.maps = {'TIME_P': ttp, 'TIME_S': tts}
 
 
     def compute_3DVelocity(self,INPUT_FILE):

@@ -1036,6 +1036,8 @@ class SeisScan:
     
         '''
 
+        print('Fitting Gaussian for {} -  {} -  {}'.format(PHASE,cstart,eventT))
+
         sampling_rate = self.sample_rate
         trig_idx = int(((eventT-cstart).seconds + (eventT-cstart).microseconds/10.**6) *sampling_rate)
 
@@ -1054,7 +1056,8 @@ class SeisScan:
             sigma = np.absolute(popt[2]) # Get standard deviation from gaussian fit
 
             # Mean is popt[1]. x_data[0] + popt[1] (In seconds)
-            mean = cstart + timedelta(seconds=float(popt[1] + x_data[0]))
+            mean = cstart + timedelta(seconds=float(popt[1]))
+            print(mean)
         except:
             sigma = -1
             mean  = -1
@@ -1093,7 +1096,7 @@ class SeisScan:
                 stationEventST = EVENT_MaxCoa['DT'] + timedelta(seconds=tts[s])
 
                 if self.PickingType == 'Gaussian':
-                    Err,Mn = self._GaussianTrigger(SNR_P[s],'S',self.DATA.startTime,stationEventPT.to_pydatetime())
+                    Err,Mn = self._GaussianTrigger(SNR_P[s],'S',self.DATA.startTime,stationEventST.to_pydatetime())
 
                 tmpSTATION = pd.DataFrame([[self.lookup_table.station_data['Name'][s],'S',stationEventST,Mn,Err]],columns=['Name','Phase','ModelledTime','PickTime','PickError'])
                 STATIONS = STATIONS.append(tmpSTATION)
