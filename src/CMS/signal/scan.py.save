@@ -247,6 +247,17 @@ class SeisOutFile:
         SeisPLT.CoalescenceVideo(SaveFilename='{}_{}'.format(filename,EventName))
         SeisPLT.CoalescenceMarginal(SaveFilename='{}_{}'.format(filename,EventName))
 
+    def write_coalPicture(self,MAP,lookup_table,DATA,EventCoaVal,EventName):
+        '''
+            Writing the coalescence picture to file for each event
+        '''
+
+        filename = path.join(self.path,self.name)
+
+        SeisPLT = SeisPlot(MAP,lookup_table,DATA,EventCoaVal)
+        SeisPLT.CoalescenceMarginal(SaveFilename='{}_{}'.format(filename,EventName))
+
+
     def write_stationsfile(self,STATIONS,EventName):
         '''
             Writing the stations file
@@ -876,11 +887,7 @@ class SeisScan:
         sige = samples[0]
         sign = samples[1]
         sigz = samples[2]
-
-        # Demeaning the data 
-        #sige = sige - np.mean(sige,axis=1)
-        #sign = sign - np.mean(sign,axis=1)
-        #sigz = sigz - np.mean(sigz,axis=1)
+        
 
         snr_p1 = self._compute_onset_p1(sigz, srate)
         snr_s1 = self._compute_onset_s1(sige, sign, srate)
@@ -1259,8 +1266,6 @@ class SeisScan:
                 self.MAP = MAP
                 self.EVENT = EventCoaVal
                 self.output.write_coalVideo(self.lookup_table,MAP,self.DATA,EventCoaVal,EVENTS['EventID'].iloc[e])
-
-
 
 
             

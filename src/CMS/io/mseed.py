@@ -82,9 +82,6 @@ class MSEED():
                 # Trace not completly active during this period
                 continue 
 
-
-
-
         return signal,stationAva
 
 
@@ -113,12 +110,14 @@ class MSEED():
         if self.Type == 'YEAR/JD/STATION':
             dy = 0
             FILES = []
-            while (self.endTime.timetuple().tm_yday) >= (self.startTime + timedelta(days=dy)).timetuple().tm_yday:
+            #print(float(self.endTime.year) + float('0.{}'.format(self.endTime.timetuple().tm_yday)))
+            #print(float(self.startTime.year) + float('0.{}'.format((self.startTime + timedelta(days=dy)).timetuple().tm_yday)))
+            while self.endTime >=  (self.startTime + timedelta(days=dy)):
                 # Determine current time
                 ctime = self.startTime + timedelta(days=dy)
-
+                #print(ctime)
                 for st in self.lookup_table.station_data['Name'].tolist():
-                    FILES.extend(glob('{}/{}/{}/*{}*'.format(self.MSEED_path,ctime.year,ctime.timetuple().tm_yday,st)))
+                    FILES.extend(glob('{}/{}/{}/*{}*'.format(self.MSEED_path,ctime.year,str(ctime.timetuple().tm_yday).zfill(3),st)))
 
                 dy += 1 
 
@@ -136,12 +135,13 @@ class MSEED():
         self.endTime      = datetime.strptime(endtime,'%Y-%m-%dT%H:%M:%S.%f')
 
         self._load_fromPath()
-
+        #print(self.FILES)
         #print('Loading the MSEED')
 
         # Loading the required mseed data
         c=0
         for f in self.FILES:
+          #print(f)
           try:
              if c==0:
                 st = obspy.read(f,starttime=UTCDateTime(self.startTime),endtime=UTCDateTime(self.endTime))
@@ -149,8 +149,8 @@ class MSEED():
              else:
                 st += obspy.read(f,starttime=UTCDateTime(self.startTime),endtime=UTCDateTime(self.endTime))
           except:
-            continue
-            #print('Station File not MSEED - {}'.format(f))
+             continue
+             print('Station File not MSEED - {}'.format(f))
 
         # Removing all the stations with gaps
         if len(st.get_gaps()) > 0:
@@ -166,10 +166,7 @@ class MSEED():
         #print('Detrending and Merging MSEED')
         #st.detrend()
         st.merge()
-        
-
-
-        
+        #st.detrend('demean')
         # Downsample the mseed to the same level
         #print('Downsampling MSEED')
         st = _downsample(st,sampling_rate)
