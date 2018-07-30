@@ -166,7 +166,7 @@ class MSEED():
         #print('Detrending and Merging MSEED')
         #st.detrend()
         st.merge()
-        #st.detrend('demean')
+        st.detrend('demean')
         # Downsample the mseed to the same level
         #print('Downsampling MSEED')
         st = _downsample(st,sampling_rate)
