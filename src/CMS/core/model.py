@@ -83,14 +83,16 @@ def _proj_wgs84():
 def _proj_nad27():
     return pyproj.Proj("+proj=longlat +ellps=clrk66 +datum=NAD27 +no_defs")  # "+init=EPSG:4267"
 
+def _utm_zone(longitude):
+    return (int(1 + math.fmod((longitude + 180.0) / 6.0, 60)))
 
 def _proj_wgs84_utm(longitude):
-    zone = (int(1 + math.fmod((longitude + 180.0) / 6.0, 60)))
+    zone = _utm_zone(longitude)
     return pyproj.Proj("+proj=utm +zone={0:d} +datum=WGS84 +units=m +no_defs".format(zone))
 
 
 def eikonal(x,y,z,V,S):
-    ''' 
+    '''
         Travel-Time formulation using a simple eikonal method.
         Requires the skifmm python package.
 
@@ -102,13 +104,13 @@ def eikonal(x,y,z,V,S):
             S - Definition of the station location in grid
 
         Outputs:
-            t - Travel-time numpy array 
+            t - Travel-time numpy array
 
     '''
     t=[]
 
     dx = float(x[1]-x[0])
-    phi = -1*np.ones_like(V)    
+    phi = -1*np.ones_like(V)
 
     if S.ndim==1:
         S=np.array([S]);
@@ -125,18 +127,18 @@ def eikonal(x,y,z,V,S):
             iy = np.abs(y-S[i,1]).argmin();
         if ndim>2:
             iz = np.abs(z-S[i,2]).argmin();
-    
+
         if ndim>2:
-            phi[iy,ix,iz]=1;    
+            phi[iy,ix,iz]=1;
         elif ndim>1:
-            phi[iy,ix]=1;    
+            phi[iy,ix]=1;
         else:
             phi[ix]=1;
-    
+
         t_comp = skfmm.travel_time(phi, V, dx)
-    
+
         t.append(t_comp)
-    
+
     return t
 
 
@@ -160,6 +162,7 @@ class Grid3D:
         self.grid_azimuth = azimuth
         self.grid_dip = dip
         self.sort_order = sort_order
+        self.UTM_zones_different = False
 
     @property
     def grid_center(self):
@@ -273,6 +276,22 @@ class Grid3D:
             return True
         else:
             return False
+
+    def get_NLLOC_gridcenter(self,NLLOCorg_lon,NLLOCorg_lat):
+        self._longitude = NLLOCorg_lon
+        self._coord_proj = _proj_wgs84()
+        self._grid_proj = _proj_wgs84_utm(self.longitude)
+        self.grid_origin_xy=self.lonlat2xy(NLLOCorg_lon,NLLOCorg_lat)
+        self._grid_center[0],self._grid_center[1]=(self.grid_origin_xy[0]+self.center[0],self.grid_origin_xy[1]+self.center[1])
+        self._longitude,self._latitude=self.xy2lonlat(self._grid_center[0],self._grid_center[1])
+        if _utm_zone(self.longitude) != _utm_zone(NLLOCorg_lon):
+            self.UTM_zones_different=True
+            self._coord_proj = _proj_wgs84()
+            self._grid_proj = _proj_wgs84_utm(self.longitude)
+            self.grid_origin_xy=self.lonlat2xy(NLLOCorg_lon,NLLOCorg_lat)
+            self._grid_center[0],self._grid_center[1]=(self.grid_origin_xy[0]+self.center[0],self.grid_origin_xy[1]+self.center[1])
+            self._longitude,self._latitude=self.xy2lonlat(self._grid_center[0],self._grid_center[1])
+        self._update_grid_center()
 
     def set_lonlat(self, longitude=None, latitude=None, coord_proj=None, grid_proj=None):
         if coord_proj:
@@ -437,11 +456,10 @@ class NonLinLoc:
             self.NLLoc_MapOrg  =  [trans[5],trans[3],trans[7],'Simple','0.0','0.0']
         if trans[1] == 'LAMBERT':
             self.NLLoc_proj    = 'LAMBERT'
-            print([trans[7],trans[5],trans[13],trans[3],trans[9],trans[11]])
             self.NLLoc_MapOrg  =  [trans[7],trans[5],trans[13],trans[3],trans[9],trans[11]]
 
 
-        # Reading the buf file 
+        # Reading the buf file
         fid = open('{}.buf'.format(FileName),'rb')
         data = struct.unpack('{}f'.format(self.NLLoc_n[0]*self.NLLoc_n[1]*self.NLLoc_n[2]),fid.read(self.NLLoc_n[0]*self.NLLoc_n[1]*self.NLLoc_n[2]*4))
         self.NLLoc_data = np.array(data).reshape(self.NLLoc_n[0],self.NLLoc_n[1],self.NLLoc_n[2])
@@ -449,8 +467,8 @@ class NonLinLoc:
 
     def NLLOC_ProjectGrid(self):
         '''
-            Projecting the grid to the new coordinate system. This function also determines the 3D grid from the 2D 
-            grids from NonLinLoc 
+            Projecting the grid to the new coordinate system. This function also determines the 3D grid from the 2D
+            grids from NonLinLoc
         '''
 
         # Generating the correct NonLinLoc Formated Grid
@@ -477,7 +495,7 @@ class NonLinLoc:
 
     def NLLOC_RedefineGrid(self,Decimate):
         '''
-            Redefining coordinate system to the file loaded 
+            Redefining coordinate system to the file loaded
         '''
 
         # Decimating the grid by the factor defined
@@ -491,18 +509,16 @@ class NonLinLoc:
         if (self.NLLoc_proj == 'NONE'):
             self.azimuth    = 0.0
             self.grid_center = self.center
-        
+
         if (self.NLLoc_proj == 'SIMPLE'):
             self.azimuth = self.NLLoc_MapOrg[2]
-            self.set_lonlat(self.NLLoc_MapOrg[0],self.NLLoc_MapOrg[1])
-            self.grid_center = self.center
-            self.setproj_wgs84()
+            self.get_NLLOC_gridcenter(float(self.NLLoc_MapOrg[0]),float(self.NLLoc_MapOrg[1]))
+            self.grid_center[2] = self.center[2]
 
         if (self.NLLoc_proj == 'LAMBERT'):
-            self.azimuth = self.NLLoc_MapOrg[2]
-            self.set_lonlat(self.NLLoc_MapOrg[0],self.NLLoc_MapOrg[1])
-            self.grid_center = self.center
-            self.setproj_wgs84()
+            self.azimuth = float(self.NLLoc_MapOrg[2])
+            self.get_NLLOC_gridcenter(float(self.NLLoc_MapOrg[0]),float(self.NLLoc_MapOrg[1]))
+            self.grid_center[2] = self.center[2]
 
         self.NLLoc_data = self.decimate_array(self.NLLoc_data,np.array(Decimate))[:,:,::-1]
 
@@ -524,10 +540,10 @@ class LUT(Grid3D,NonLinLoc):
     '''
 
     #   Additions to be made to the program:
-    #       - Weighting of the stations with distance, allow the user to define their own tables 
-    #         or define a fixed weighting for the problem. 
+    #       - Weighting of the stations with distance, allow the user to define their own tables
+    #         or define a fixed weighting for the problem.
     #
-    #       - 
+    #       -
     #
     #
 
@@ -541,7 +557,7 @@ class LUT(Grid3D,NonLinLoc):
         self.velocity_model = None
         self.station_data = None
         self._maps = dict()
-        self.data = None 
+        self.data = None
 
     @property
     def maps(self):
@@ -562,8 +578,8 @@ class LUT(Grid3D,NonLinLoc):
                 flag[i] = True
 
     def decimate(self, ds, inplace=False):
-        ''' 
-            Function used to decimate the travel-time tables either supplied by NonLinLoc or through 
+        '''
+            Function used to decimate the travel-time tables either supplied by NonLinLoc or through
             the inbuilt functions:
 
 
@@ -605,7 +621,7 @@ class LUT(Grid3D,NonLinLoc):
         self.center = center
 
         ARRAY = np.ascontiguousarray(DATA[c1[0]::ds[0], c1[1]::ds[1], c1[2]::ds[2]])
-        return ARRAY 
+        return ARRAY
 
 
     def get_station_xyz(self, station=None):
@@ -691,10 +707,10 @@ class LUT(Grid3D,NonLinLoc):
 
 
     def compute_Homogeous(self,VP,VS):
-        ''' 
-            Function used to compute Travel-time tables in a homogeous 
+        '''
+            Function used to compute Travel-time tables in a homogeous
             velocity model
-            
+
             Input:
                 VP - P-wave velocity (km/s, float)
                 VS - S-wave velocity (km/s, float)
@@ -798,12 +814,12 @@ class LUT(Grid3D,NonLinLoc):
     def compute_3DNLLoc(self,PATH,RedefineCoord=False,Decimate=[1,1,1]):
 
         '''
-            Function to read in NonLinLoc Tables to be used for the Travel-Time  
-            tables. 
+            Function to read in NonLinLoc Tables to be used for the Travel-Time
+            tables.
 
             INPUTS:
                 PATH - Full path to where the .buf and .hdr files can be found from
-                        the NonLinLoc output files 
+                        the NonLinLoc output files
 
 
 
@@ -812,13 +828,13 @@ class LUT(Grid3D,NonLinLoc):
         for st in range(nstn):
             name = self.station_data['Name'][st]
             print('Loading TTp and TTs for {}'.format(name))
-            
+
             # Reading in P-wave
             self.NLLOC_LoadFile('{}.P.{}.time'.format(PATH,name))
 
             if (RedefineCoord == False):
                 self.NLLOC_ProjectGrid()
-            else:              
+            else:
                 self.NLLOC_RedefineGrid(Decimate)
 
             if ('map_p1' not in locals()) and ('map_s1' not in locals()):
@@ -843,7 +859,7 @@ class LUT(Grid3D,NonLinLoc):
 
 
         self.maps = {'TIME_P':map_p1, 'TIME_S':map_s1}
- 
+
 
     def save(self,FILENAME):
         '''
@@ -865,7 +881,7 @@ class LUT(Grid3D,NonLinLoc):
 
 
     def plot_station(self):
-        ''' 
+        '''
             Function to plot a 2D representation of the station locations
 
         '''
@@ -947,4 +963,4 @@ class LUT(Grid3D,NonLinLoc):
     #     else:
     #         plt.show()
 
- 
+
