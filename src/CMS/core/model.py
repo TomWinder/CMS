@@ -756,6 +756,10 @@ class LUT(Grid3D,NonLinLoc):
         gvp = np.interp(iz, -Z, VP)
         gvs = np.interp(iz, -Z, VS)
 
+
+
+
+
         for s in range(stn.shape[0]):
             print("Generating 1D Travel-Time Table - {} of {}".format(s+1,stn.shape[0]))
 
@@ -763,10 +767,10 @@ class LUT(Grid3D,NonLinLoc):
             y = np.arange(min(coord[:,1]),max(coord[:,1]),self.cell_size[1])
             z = np.arange(min(coord[:,2]),max(coord[:,2]),self.cell_size[2])
 
-            print(eikonal(x,y,z,gvp,np.array([s])))
+            #print(eikonal(x,y,z,gvp,np.array([s])))
 
-            ttp[..., s] = eikonal(x,y,z,gvp,np.array([s]))[0]
-            tts[..., s] = eikonal(x,y,z,gvs,np.array([s]))[0]
+            ttp[..., s] = eikonal(x,y,z,gvp,stn[s][np.newaxis,:])[0]
+            tts[..., s] = eikonal(x,y,z,gvs,stn[s][np.newaxis,:])[0]
 
         self.maps = {'TIME_P': ttp, 'TIME_S': tts}
 
@@ -803,8 +807,8 @@ class LUT(Grid3D,NonLinLoc):
             y = np.arange(min(coord[:,1]),max(coord[:,1]),self.cell_size[1])
             Z = np.arange(min(coord[:,2]),max(coord[:,2]),self.cell_size[2])
 
-            ttp[..., p] = eikonal(x,y,z,gvp,np.array([s]))[0]
-            tts[..., s] = eikonal(x,y,z,gvs,np.array([s]))[0]
+            ttp[..., p] = eikonal(x,y,z,gvp,stn[s][np.newaxis,:])[0]
+            tts[..., s] = eikonal(x,y,z,gvs,stn[s][np.newaxis,:])[0]
 
         self.maps = {'TIME_P': ttp1, 'TIME_S': tts}
 

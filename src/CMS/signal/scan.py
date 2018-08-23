@@ -153,6 +153,12 @@ class SeisOutFile:
         fname = path.join(self.path,self.name + '_Event.txt')
         EVENT.to_csv(fname,index=False)
 
+    def del_scan(self):
+        fname = path.join(self.path,self.name + '.scn')
+        if path.exists(fname):
+           os.system('rm fname')
+
+
     def write_scan(self,daten,dsnr,dloc):
         # Defining the ouput filename
         fname = path.join(self.path,self.name + '.scn')
@@ -236,7 +242,7 @@ class SeisOutFile:
         np.save(fname,map4D)
 
 
-    def write_coalVideo(self,MAP,lookup_table,DATA,EventCoaVal,EventName):
+    def write_coalVideo(self,MAP,lookup_table,DATA,EventCoaVal,EventName,AdditionalOptions=None):
         '''
             Writing the coalescence video to file for each event
         '''
@@ -244,6 +250,7 @@ class SeisOutFile:
         filename = path.join(self.path,self.name)
 
         SeisPLT = SeisPlot(MAP,lookup_table,DATA,EventCoaVal)
+	
         SeisPLT.CoalescenceVideo(SaveFilename='{}_{}'.format(filename,EventName))
         SeisPLT.CoalescenceMarginal(SaveFilename='{}_{}'.format(filename,EventName))
 
@@ -301,6 +308,9 @@ class SeisPlot:
 
         self.CoaTraceVLINE = None
         self.CoaValVLINE   = None
+
+	# Plotting additional XY features
+        self.XYFiles = None
 
         # Updating the Coalescence Maps
         self.CoaXYPlt = None
@@ -427,6 +437,17 @@ class SeisPlot:
             Coa_XYSlice.annotate(txt,[self.LUT.station_data['Longitude'][i],self.LUT.station_data['Latitude'][i]])
 
 
+	#  ------------- Plotting the XYFiles -----------
+        if self.XYFiles != None:
+           XYFiles = pd.read_csv(self.XYFiles,names=['File','Color','Linewidth','Linestyle'])
+           c=0
+           for ff in XYFiles['File']:
+                XYF = pd.read_csv(ff,names=['X','Y'])		
+                Coa_XYSlice.plot(XYF['X'],XYF['Y'],linestyle=XYFiles['Linestyle'].iloc[c],linewidth=XYFiles['Linewidth'].iloc[c],color=XYFiles['Color'].iloc[c])
+                c+=1
+
+
+
         #  ------------- Plotting the station Locations -----------
         try:
             Coa_Logo.axis('off')
@@ -487,8 +508,6 @@ class SeisPlot:
         self.CoaArriavalTS.set_offsets(np.c_[TS,(np.arange(self.DATA.signal.shape[1])+1)])
 
 
-
-
         # # Updating the station travel-times
         # self.CoaArriavalTP.remove()
         # self.CoaArriavalTS.remove()
@@ -531,15 +550,25 @@ class SeisPlot:
 
         '''
 
+
+
+        TimeSliceIndex = np.where(self.times == self.EVENT['DT'].iloc[np.argmax(self.EVENT['COA'])])[0][0]
+        TimeSlice = self.times[TimeSliceIndex]
+        index = np.where(self.EVENT['DT'] == TimeSlice)[0][0]
+        indexVal1 = self.LUT.coord2loc(np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]])).astype(int)[0]
+        indexCoord = np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]])[0,:]
+
+
+
         # Gaussian fit about the time period 
-
-        fig = plt.figure(figsize=(15,15))
+        fig = plt.figure(figsize=(30,15))
         fig.patch.set_facecolor('white')
-        Coa_XYSlice  =  plt.subplot2grid((3, 3), (0, 0), colspan=2,rowspan=2)
-        Coa_YZSlice  =  plt.subplot2grid((3, 3), (2, 0), colspan=2)
-        Coa_XZSlice  =  plt.subplot2grid((3, 3), (0, 2), rowspan=2)
-        Coa_Logo     =  plt.subplot2grid((3, 3), (2, 2))
-
+        Coa_XYSlice  =  plt.subplot2grid((3, 5), (0, 0), colspan=2,rowspan=2)
+        Coa_YZSlice  =  plt.subplot2grid((3, 5), (2, 0), colspan=2)
+        Coa_XZSlice  =  plt.subplot2grid((3, 5), (0, 2), rowspan=2)
+        Coa_Trace    =  plt.subplot2grid((3, 5), (0, 3), colspan=2,rowspan=2)
+        Coa_Logo     =  plt.subplot2grid((3, 5), (2, 2))
+        Coa_CoaVal   =  plt.subplot2grid((3, 5), (2, 3), colspan=2)
 
         # Determining the maginal window value from the coalescence function
         mMAP = self.MAP
@@ -579,6 +608,61 @@ class SeisPlot:
 
         # lambda_, v = np.linalg.eig(cov_matrix)
         # lambda_ = np.sqrt(lambda_)
+
+
+        # ---------------- Plotting the Traces -----------
+        STIn = np.where(self.times == self.EVENT['DT'].iloc[0])[0][0]
+        ENIn = np.where(self.times == self.EVENT['DT'].iloc[-1])[0][0]
+
+        for ii in range(self.DATA.signal.shape[1]): 
+            if self.FilteredSignal == False:
+                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[0,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[0,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'r',linewidth=0.5)
+                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[1,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[1,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'b',linewidth=0.5)
+                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[2,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[2,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'g',linewidth=0.5)
+            else:
+                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[0,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[0,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'r',linewidth=0.5)
+                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[1,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[1,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'b',linewidth=0.5)
+                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[2,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[2,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'g',linewidth=0.5)
+
+
+        # ---------------- Plotting the Station Travel Times -----------
+        for i in range(self.LUT.get_value_at('TIME_P',np.array([indexVal1]))[0].shape[0]):
+            tp = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_P',np.array([indexVal1]))[0][i])))/timedelta(seconds=1)))
+            ts = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_S',np.array([indexVal1]))[0][i])))/timedelta(seconds=1)))
+
+            if i == 0:
+                TP = tp
+                TS = ts
+            else:
+                TP = np.append(TP,tp)
+                TS = np.append(TS,ts)
+
+        self.CoaArriavalTP = Coa_Trace.scatter(TP,(np.arange(self.DATA.signal.shape[1])+1),15,'r',marker='v')
+        self.CoaArriavalTS = Coa_Trace.scatter(TS,(np.arange(self.DATA.signal.shape[1])+1),15,'b',marker='v')
+
+        Coa_Trace.set_ylim([0,ii+2])
+        Coa_Trace.set_xlim([STIn,np.nanmax(TS)])
+        Coa_Trace.get_xaxis().set_ticks([])
+        Coa_Trace.yaxis.tick_right()
+        Coa_Trace.yaxis.set_ticks(np.arange(self.DATA.signal.shape[1])+1)
+        Coa_Trace.yaxis.set_ticklabels(self.DATA.StationInformation['Name'])
+        self.CoaTraceVLINE = Coa_Trace.axvline(TimeSlice,0,1000,linestyle='--',linewidth=2,color='r')
+
+
+        # ------------- Plotting the Coalescence Function ----------- 
+        Coa_CoaVal.plot(self.EVENT['DT'],self.EVENT['COA'])
+        Coa_CoaVal.set_ylabel('Coalescence Value')
+        Coa_CoaVal.set_xlabel('Date-Time')
+        Coa_CoaVal.yaxis.tick_right()
+        Coa_CoaVal.yaxis.set_label_position("right")
+        Coa_CoaVal.set_xlim([self.times[STIn],self.times[ENIn]])
+        Coa_CoaVal.format_xdate = mdates.DateFormatter('%Y-%m-%d') #FIX - Not working
+        for tick in Coa_CoaVal.get_xticklabels():
+                tick.set_rotation(45)
+        self.CoaValVLINE   = Coa_CoaVal.axvline(TimeSlice,0,1000,linestyle='--',linewidth=2,color='r')
+
+
+
 
         # Plotting the marginal window
         gridX,gridY = np.mgrid[min(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,0]):max(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,0]):(max(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,0]) - min(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,0]))/self.LUT.cell_count[0], min(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,1]):max(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,1]):(max(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,1]) - min(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,1]))/self.LUT.cell_count[1]]
@@ -626,13 +710,21 @@ class SeisPlot:
         Coa_XZSlice.axvline(x=indexCoord[0][2],linestyle='--',linewidth=2,color='k')
         Coa_XZSlice.axhline(y=indexCoord[0][1],linestyle='--',linewidth=2,color='k')
 
-
+	# Plotting the station locations
         Coa_XYSlice.scatter(self.LUT.station_data['Longitude'],self.LUT.station_data['Latitude'],15,'k',marker='^')
         Coa_YZSlice.scatter(self.LUT.station_data['Longitude'],self.LUT.station_data['Elevation'],15,'k',marker='^')
         Coa_XZSlice.scatter(self.LUT.station_data['Elevation'],self.LUT.station_data['Latitude'],15,'k',marker='<')
         for i,txt in enumerate(self.LUT.station_data['Name']):
             Coa_XYSlice.annotate(txt,[self.LUT.station_data['Longitude'][i],self.LUT.station_data['Latitude'][i]])
 
+	# Plotting the XYFiles
+        if self.XYFiles != None:
+           XYFiles = pd.read_csv(self.XYFiles,names=['File','Color','Linewidth','Linestyle'])
+           c=0
+           for ff in XYFiles['File']:
+                XYF = pd.read_csv(ff,names=['X','Y'])		
+                Coa_XYSlice.plot(XYF['X'],XYF['Y'],linestyle=XYFiles['Linestyle'].iloc[c],linewidth=XYFiles['Linewidth'].iloc[c],color=XYFiles['Color'].iloc[c])
+                c+=1
 
         # Plotting the logo
         try:
@@ -815,6 +907,7 @@ class SeisScan:
         self.MarginalWindow     = 30
         self.CoalescenceGrid    = False
         self.CoalescenceVideo   = False
+        self.CoalescencePicture = False
         self.PickingType        = 'Gaussian'
         self.LocationError      = 0.95
 
@@ -825,6 +918,7 @@ class SeisScan:
 
         self.MAP = None
         self.EVENT = None
+        self.XYFiles = None
 
 
     def _pre_proc_p1(self, sig_z, srate):
@@ -937,7 +1031,8 @@ class SeisScan:
         self.StartDateTime = datetime.strptime(starttime,'%Y-%m-%dT%H:%M:%S.%f')
         self.EndDateTime   = datetime.strptime(endtime,'%Y-%m-%dT%H:%M:%S.%f')
 
-
+	# Deleting the scan if it exists alreadys
+        self.output.del_scan()
 
         if self.pre_pad == 0.0 and self.post_pad == 0.0:
             self.pre_pad = sum(np.max(np.array([self.onset_win_p1,self.onset_win_s1]),0))
@@ -1040,7 +1135,7 @@ class SeisScan:
     
         '''
 
-        print('Fitting Gaussian for {} -  {} -  {}'.format(PHASE,cstart,eventT))
+        #print('Fitting Gaussian for {} -  {} -  {}'.format(PHASE,cstart,eventT))
 
         sampling_rate = self.sample_rate
         trig_idx = int(((eventT-cstart).seconds + (eventT-cstart).microseconds/10.**6) *sampling_rate)
@@ -1248,21 +1343,27 @@ class SeisScan:
 
             # Outputting coalescence grids and triggered events
             if self.CoalescenceGrid == True:
-
-                # CoaMap = {}
-                # CoaMap['MAP'] = MAP
-                # CoaMap['CoaDATA'] = tmpEvent
                 self.output.write_coal4D(MAP,e,cstart,cend)
 
 
+            self.MAP = MAP
+            self.EVENT = EventCoaVal
+
             if self.CoalescenceVideo == True:
-                self.MAP = MAP
-                self.EVENT = EventCoaVal
-                self.output.write_coalVideo(self.lookup_table,MAP,self.DATA,EventCoaVal,EVENTS['EventID'].iloc[e])
+                SeisPLT = SeisPlot(self.lookup_table,MAP,self.DATA,self.EVENT)
+                if self.XYFiles != None:
+                   SeisPLT.XYFiles = self.XYFiles
+                SeisPLT.CoalescenceVideo(SaveFilename='{}_{}'.format(path.join(self.output.path, self.output.name),EVENTS['EventID'].iloc[e]))
 
 
+            if self.CoalescencePicture == True:
+                SeisPLT = SeisPlot(self.lookup_table,MAP,self.DATA,self.EVENT)
+                if self.XYFiles != None:
+                   SeisPLT.XYFiles = self.XYFiles
+                SeisPLT.CoalescenceMarginal(SaveFilename='{}_{}'.format(path.join(self.output.path, self.output.name),EVENTS['EventID'].iloc[e]))
 
 
+ 
             
             Triggered = Triggered.append(EVENT)
 

@@ -95,7 +95,8 @@ class MSEED():
         if TYPE == 'YEAR/JD/STATION':
             self.Type  = 'YEAR/JD/STATION'
 
-
+        if TYPE == 'STATION.YEAR.JULIANDAY':
+            self.Type = 'STATION.YEAR.JULIANDAY'
 
 
     def _load_fromPath(self):
@@ -121,6 +122,21 @@ class MSEED():
 
                 dy += 1 
 
+        if self.Type == 'STATION.YEAR.JULIANDAY':
+            dy = 0
+            FILES = []
+            #print(float(self.endTime.year) + float('0.{}'.format(self.endTime.timetuple().tm_yday)))
+            #print(float(self.startTime.year) + float('0.{}'.format((self.startTime + timedelta(days=dy)).timetuple().tm_yday)))
+            while self.endTime >=  (self.startTime + timedelta(days=dy)):
+                # Determine current time
+                ctime = self.startTime + timedelta(days=dy)
+                #print(ctime)
+                for st in self.lookup_table.station_data['Name'].tolist():
+                    FILES.extend(glob('{}/*{}.*.{}.{}'.format(self.MSEED_path,st,ctime.year,str(ctime.timetuple().tm_yday).zfill(3))))
+
+                dy += 1 
+
+
         self.FILES = FILES
 
 
@@ -133,48 +149,45 @@ class MSEED():
 
         self.startTime = datetime.strptime(starttime,'%Y-%m-%dT%H:%M:%S.%f')
         self.endTime      = datetime.strptime(endtime,'%Y-%m-%dT%H:%M:%S.%f')
-
-        self._load_fromPath()
-        #print(self.FILES)
-        #print('Loading the MSEED')
-
-        # Loading the required mseed data
-        c=0
-        for f in self.FILES:
-          #print(f)
-          try:
-             if c==0:
-                st = obspy.read(f,starttime=UTCDateTime(self.startTime),endtime=UTCDateTime(self.endTime))
-                c +=1
-             else:
-                st += obspy.read(f,starttime=UTCDateTime(self.startTime),endtime=UTCDateTime(self.endTime))
-          except:
-             continue
-             print('Station File not MSEED - {}'.format(f))
-
-        # Removing all the stations with gaps
-        if len(st.get_gaps()) > 0:
-            stationRem = np.unique(np.array(st.get_gaps())[:,1]).tolist()
-            for sa in stationRem:
-                tr = st.select(station=sa)
-                for tra in tr:
-
-                    st.remove(tra) 
-
-
-        # Combining the mseed and determining station avaliability
-        #print('Detrending and Merging MSEED')
-        #st.detrend()
-        st.merge()
-        st.detrend('demean')
-        # Downsample the mseed to the same level
-        #print('Downsampling MSEED')
-        st = _downsample(st,sampling_rate)
         self.sampling_rate = sampling_rate
+        self._load_fromPath()
 
-        # Checking the station Avaliability for each of the stations across this time period
-        #print('stationAvaliability MSEED')
-        signal,stA = self._stationAvaliability(st)
+        if len(self.FILES) > 0:
+		# Loading the required mseed data
+                c=0
+                for f in self.FILES:
+                  try:
+                    if c==0:
+                      st = obspy.read(f,starttime=UTCDateTime(self.startTime),endtime=UTCDateTime(self.endTime))
+                      c +=1
+                    else:
+                      st += obspy.read(f,starttime=UTCDateTime(self.startTime),endtime=UTCDateTime(self.endTime))
+                  except:
+                    continue
+                    print('Station File not MSEED - {}'.format(f))
+
+                # Removing all the stations with gaps
+                if len(st.get_gaps()) > 0:
+                  stationRem = np.unique(np.array(st.get_gaps())[:,1]).tolist()
+                  for sa in stationRem:
+                    tr = st.select(station=sa)
+                    for tra in tr:
+                      st.remove(tra) 
+
+
+                # Combining the mseed and determining station avaliability
+                st.merge()
+                st.detrend('demean')
+                st = _downsample(st,sampling_rate)
+                signal,stA = self._stationAvaliability(st)
+
+        else:
+                print('Data Does not exist for this time period - creating blank')
+                # Files don't exisit so creating zeros ones instead
+                exSamples = (endT-stT).total_seconds()*self.sampling_rate + 1
+                stationAva = np.zeros((len(self.lookup_table.station_data['Name']),1))
+                signal     = np.zeros((3,len(self.lookup_table.station_data['Name']),int(exSamples)))
+
 
 
         self.signal  = signal
