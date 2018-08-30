@@ -624,11 +624,10 @@ class SeisPlot:
                     Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[1,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[1,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'b',linewidth=0.5)
                     Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[2,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[2,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'g',linewidth=0.5)
 
-
         # ---------------- Plotting the Station Travel Times -----------
-        for i in range(self.LUT.get_value_at('TIME_P',np.array([indexVal1]))[0].shape[0]):
-            tp = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_P',np.array([indexVal1]))[0][i])))/timedelta(seconds=1)))
-            ts = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_S',np.array([indexVal1]))[0][i])))/timedelta(seconds=1)))
+        for i in range(self.LUT.get_value_at('TIME_P',np.array([indexVal]))[0].shape[0]):
+            tp = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_P',np.array([indexVal]))[0][i])))/timedelta(seconds=1)))
+            ts = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_S',np.array([indexVal]))[0][i])))/timedelta(seconds=1)))
 
             if i == 0:
                 TP = tp
@@ -637,17 +636,17 @@ class SeisPlot:
                 TP = np.append(TP,tp)
                 TS = np.append(TS,ts)
 
+
         self.CoaArriavalTP = Coa_Trace.scatter(TP,(np.arange(self.DATA.signal.shape[1])+1),15,'r',marker='v')
         self.CoaArriavalTS = Coa_Trace.scatter(TS,(np.arange(self.DATA.signal.shape[1])+1),15,'b',marker='v')
 
         Coa_Trace.set_ylim([0,ii+2])
-        Coa_Trace.set_xlim([STIn,np.nanmax(TS)])
+        Coa_Trace.set_xlim([STIn,ENIn])
         Coa_Trace.get_xaxis().set_ticks([])
         Coa_Trace.yaxis.tick_right()
         Coa_Trace.yaxis.set_ticks(np.arange(self.DATA.signal.shape[1])+1)
         Coa_Trace.yaxis.set_ticklabels(self.DATA.StationInformation['Name'])
         self.CoaTraceVLINE = Coa_Trace.axvline(TimeSlice,0,1000,linestyle='--',linewidth=2,color='r')
-
 
         # ------------- Plotting the Coalescence Function ----------- 
         Coa_CoaVal.plot(self.EVENT['DT'],self.EVENT['COA'])
@@ -1027,6 +1026,7 @@ class SeisScan:
         # 2. Defining the pre- and post- padding
         # 3.  
 
+        CoaV = 0.0
 
         self.StartDateTime = datetime.strptime(starttime,'%Y-%m-%dT%H:%M:%S.%f')
         self.EndDateTime   = datetime.strptime(endtime,'%Y-%m-%dT%H:%M:%S.%f')
@@ -1056,12 +1056,16 @@ class SeisScan:
             #daten, dsnr, dloc = self._compute_s1(0.0, DATA.signal)
             daten, dsnr, dloc, map = self._compute(cstart,cend, self.DATA.signal,self.DATA.station_avaliability)
 
-
-
-
             dcoord = self.lookup_table.xyz2coord(dloc)
             self.output.FileSampleRate = self.Output_SampleRate
-            self.output.write_scan(daten,dsnr,dcoord)
+
+            if i == 0:
+                self.output.write_scan(daten[:-1],dsnr[:-1],dcoord[:-1,:])
+                CoaV=dsnr[-1]
+            else:
+                CoaVp = dsnr + (CoaV-dsnr[0])
+                self.output.write_scan(daten[:-1],CoaVp[:-1],dcoord[:-1,:])
+                CoaV=CoaVp[-1]
 
             i += 1
 
