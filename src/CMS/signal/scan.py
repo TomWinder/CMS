@@ -1078,6 +1078,13 @@ class SeisScan:
 
 
     def _Trigger_scn(self,CoaVal,starttime,endtime):
+
+
+        # ---- Normalising by using a sta/lta mesthod
+        COA['COA'] = classic_sta_lta(CoaVal['COA'],self.onset_win_p1[0],self.onset_win_p1[1])
+        #### FIX ! Determine time window extra !
+
+
         CoaVal = CoaVal[CoaVal['COA'] > self.DetectionThreshold]       
 
         CoaVal = CoaVal[(CoaVal['DT'] >= datetime.strptime(starttime,'%Y-%m-%dT%H:%M:%S.%f')) & (CoaVal['DT'] <= datetime.strptime(endtime,'%Y-%m-%dT%H:%M:%S.%f'))]
@@ -1294,7 +1301,7 @@ class SeisScan:
 
     def Trigger(self,starttime,endtime):
         '''
-
+        
 
         '''
 
