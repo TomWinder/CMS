@@ -176,7 +176,7 @@ class MSEED():
 
 
                 # Combining the mseed and determining station avaliability
-                st.merge()
+                st.merge(fill_value='interpolate')
                 st.detrend('demean')
                 st = _downsample(st,sampling_rate)
                 signal,stA = self._stationAvaliability(st)
