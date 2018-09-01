@@ -156,7 +156,8 @@ class SeisOutFile:
     def del_scan(self):
         fname = path.join(self.path,self.name + '.scn')
         if path.exists(fname):
-           os.system('rm fname')
+           print('Filename {} already exists. Deleting !'.format(fname))
+           os.system('rm {}'.format(fname))
 
 
     def write_scan(self,daten,dsnr,dloc):
@@ -860,8 +861,9 @@ class SeisScan:
 
         self.keep_map = False
 
-        self.pre_pad   = 0.0
-        self.post_pad  = 0.0
+        ttmax = np.max(lut.fetch_map('TIME_S'))
+        self.pre_pad   = round(0.3*ttmax)
+        self.post_pad  = round(ttmax + 0.05*ttmax)
         self.time_step = 10.0
 
         self.daten = None
@@ -1008,8 +1010,13 @@ class SeisScan:
         ilib.scan(snr, tt, 0, pre_smp + nsamp +pos_smp, self._map, self.NumberOfCores)
         ilib.detect(self._map, dsnr, dind, 0, pre_smp + nsamp +pos_smp, self.NumberOfCores)
 
+        print(dsnr)
+
         daten = np.arange((cstart+timedelta(seconds=self.pre_pad)), (cend + timedelta(seconds=-self.post_pad) + timedelta(seconds=1/srate)),timedelta(seconds=1/srate)) 
-        dsnr  = np.exp((dsnr[pre_smp:pre_smp + nsamp] / nchan) - 1.0)
+        dsnr = np.exp((dsnr / nchan) - 1.0)
+        #dsnr = classic_sta_lta(np.exp((dsnr / nchan) - 1.0),self.onset_win_p1[0]*self.sample_rate*0.5,self.onset_win_p1[1]*self.sample_rate*0.5)
+        dsnr = dsnr[pre_smp:pre_smp + nsamp]
+
         dloc  = self.lookup_table.index2xyz(dind[pre_smp:pre_smp + nsamp])
 
         MAP   = self._map[:,:,:,(pre_smp+1):pre_smp + nsamp]
@@ -1026,12 +1033,12 @@ class SeisScan:
         # 2. Defining the pre- and post- padding
         # 3.  
 
-        CoaV = 0.0
+        CoaV = 1.0
 
         self.StartDateTime = datetime.strptime(starttime,'%Y-%m-%dT%H:%M:%S.%f')
         self.EndDateTime   = datetime.strptime(endtime,'%Y-%m-%dT%H:%M:%S.%f')
 
-	# Deleting the scan if it exists alreadys
+	    # Deleting the scan if it exists alreadys
         self.output.del_scan()
 
         if self.pre_pad == 0.0 and self.post_pad == 0.0:
@@ -1060,8 +1067,9 @@ class SeisScan:
             self.output.FileSampleRate = self.Output_SampleRate
 
             if i == 0:
-                self.output.write_scan(daten[:-1],dsnr[:-1],dcoord[:-1,:])
-                CoaV=dsnr[-1]
+                CoaVp = dsnr + (CoaV-dsnr[0])
+                self.output.write_scan(daten[:-1],CoaVp[:-1],dcoord[:-1,:])
+                CoaV=CoaVp[-1]
             else:
                 CoaVp = dsnr + (CoaV-dsnr[0])
                 self.output.write_scan(daten[:-1],CoaVp[:-1],dcoord[:-1,:])
@@ -1118,6 +1126,40 @@ class SeisScan:
 
         return EVENTS
 
+    def plot_scn(self,stations=None,savefile=None):
+        '''
+
+
+        '''
+
+        # Defining the filename of the trace
+        fname = path.join(self.path,self.name + '.scn')
+
+        if path.exists(fname):
+            # Loading the .scn file
+            DATA = pd.read_csv(fname,names=['DT','COA','X','Y','Z'])
+            DATA['DT'] = pd.to_datetime(DATA['DT'])
+
+            if stations == None:
+                # Plotting the .scn file
+                fig = plt.figure()
+                plt.plot(DATA['DT'],DATA['COA'])
+            else:
+                # Plotting the .scn file
+                fig = plt.figure()
+                plt.plot(DATA['DT'],DATA['COA'])
+
+                # --- REDEFINE THE PLOTTING FOR STATION TRACES AS WELL ! --
+
+
+            # Saving figure if defined
+            if savefile == None:
+                plt.show()
+            else:
+                plt.savefig(savefile)
+
+        else:
+            print('Please run scn.Detect to generate a .scn file !')
 
 
 

@@ -113,7 +113,7 @@ class MSEED():
             FILES = []
             #print(float(self.endTime.year) + float('0.{}'.format(self.endTime.timetuple().tm_yday)))
             #print(float(self.startTime.year) + float('0.{}'.format((self.startTime + timedelta(days=dy)).timetuple().tm_yday)))
-            while self.endTime >=  (self.startTime + timedelta(days=dy)):
+            while self.endTime.timetuple().tm_yday >=  (self.startTime + timedelta(days=dy)).timetuple().tm_yday:
                 # Determine current time
                 ctime = self.startTime + timedelta(days=dy)
                 #print(ctime)
@@ -166,8 +166,8 @@ class MSEED():
                     continue
                     print('Station File not MSEED - {}'.format(f))
 
-                # Removing all the stations with gaps
-                if len(st.get_gaps()) > 0:
+                # Removing all the stations with gaps greater than 10.0 milliseconds
+                if len(st.get_gaps()) > 0 and np.max(np.array(st.get_gaps())[:,4]-np.array(st.get_gaps())[:,5] > 10.0) == True:
                   stationRem = np.unique(np.array(st.get_gaps())[:,1]).tolist()
                   for sa in stationRem:
                     tr = st.select(station=sa)
