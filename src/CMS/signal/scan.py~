@@ -1010,16 +1010,15 @@ class SeisScan:
         ilib.scan(snr, tt, 0, pre_smp + nsamp +pos_smp, self._map, self.NumberOfCores)
         ilib.detect(self._map, dsnr, dind, 0, pre_smp + nsamp +pos_smp, self.NumberOfCores)
 
-
         daten = np.arange((cstart+timedelta(seconds=self.pre_pad)), (cend + timedelta(seconds=-self.post_pad) + timedelta(seconds=1/srate)),timedelta(seconds=1/srate)) 
         dsnr = np.exp((dsnr / nchan) - 1.0)
-        #dsnr = classic_sta_lta(np.exp((dsnr / nchan) - 1.0),self.onset_win_p1[0]*self.sample_rate*0.5,self.onset_win_p1[1]*self.sample_rate*0.5)
+        dsnr_stalta = classic_sta_lta(np.exp((dsnr / nchan) - 1.0),self.onset_win_p1[0]*self.sample_rate*0.5,self.onset_win_p1[1]*self.sample_rate*0.5)
         dsnr = dsnr[pre_smp:pre_smp + nsamp]
 
         dloc  = self.lookup_table.index2xyz(dind[pre_smp:pre_smp + nsamp])
 
         MAP   = self._map[:,:,:,(pre_smp+1):pre_smp + nsamp]
-        return daten, dsnr, dloc, MAP
+        return daten, dsnr, dloc, MAP,
 
 
     def _continious_compute(self,starttime,endtime):
