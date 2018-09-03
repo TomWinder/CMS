@@ -1089,7 +1089,7 @@ class SeisScan:
 
 
         # ---- Normalising by using a sta/lta mesthod
-        COA['COA'] = classic_sta_lta(CoaVal['COA'],self.onset_win_p1[0],self.onset_win_p1[1])
+        #COA['COA'] = classic_sta_lta(CoaVal['COA'],self.onset_win_p1[0],self.onset_win_p1[1])
         #### FIX ! Determine time window extra !
 
 
