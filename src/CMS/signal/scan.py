@@ -615,33 +615,33 @@ class SeisPlot:
         STIn = np.where(self.times == self.EVENT['DT'].iloc[0])[0][0]
         ENIn = np.where(self.times == self.EVENT['DT'].iloc[-1])[0][0]
 
-        for ii in range(self.DATA.signal.shape[1]): 
-            if self.FilteredSignal == False:
-                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[0,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[0,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'r',linewidth=0.5)
-                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[1,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[1,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'b',linewidth=0.5)
-                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[2,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[2,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'g',linewidth=0.5)
-            else:
-                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[0,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[0,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'r',linewidth=0.5)
-                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[1,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[1,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'b',linewidth=0.5)
-                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[2,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[2,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'g',linewidth=0.5)
+#        for ii in range(self.DATA.signal.shape[1]): 
+#            if self.FilteredSignal == False:
+#                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[0,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[0,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'r',linewidth=0.5)
+#                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[1,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[1,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'b',linewidth=0.5)
+#                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[2,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[2,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'g',linewidth=0.5)
+#            else:
+#                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[0,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[0,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'r',linewidth=0.5)
+#                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[1,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[1,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'b',linewidth=0.5)
+#                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[2,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[2,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'g',linewidth=0.5)
 
-        # ---------------- Plotting the Station Travel Times -----------
-        for i in range(self.LUT.get_value_at('TIME_P',np.array([indexVal]))[0].shape[0]):
-            tp = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_P',np.array([indexVal]))[0][i])))/timedelta(seconds=1)))
-            ts = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_S',np.array([indexVal]))[0][i])))/timedelta(seconds=1)))
+#        # ---------------- Plotting the Station Travel Times -----------
+#        for i in range(self.LUT.get_value_at('TIME_P',np.array([indexVal]))[0].shape[0]):
+#            tp = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_P',np.array([indexVal]))[0][i])))/timedelta(seconds=1)))
+#            ts = np.argmin(abs((self.times.astype(datetime) - (TimeSlice.astype(datetime) + timedelta(seconds=self.LUT.get_value_at('TIME_S',np.array([indexVal]))[0][i])))/timedelta(seconds=1)))
 
-            if i == 0:
-                TP = tp
-                TS = ts
-            else:
-                TP = np.append(TP,tp)
-                TS = np.append(TS,ts)
+#            if i == 0:
+#                TP = tp
+#                TS = ts
+#            else:
+#                TP = np.append(TP,tp)
+#                TS = np.append(TS,ts)
 
 
-        self.CoaArriavalTP = Coa_Trace.scatter(TP,(np.arange(self.DATA.signal.shape[1])+1),15,'r',marker='v')
-        self.CoaArriavalTS = Coa_Trace.scatter(TS,(np.arange(self.DATA.signal.shape[1])+1),15,'b',marker='v')
+#        self.CoaArriavalTP = Coa_Trace.scatter(TP,(np.arange(self.DATA.signal.shape[1])+1),15,'r',marker='v')
+#        self.CoaArriavalTS = Coa_Trace.scatter(TS,(np.arange(self.DATA.signal.shape[1])+1),15,'b',marker='v')
 
-        Coa_Trace.set_ylim([0,ii+2])
+#        Coa_Trace.set_ylim([0,ii+2])
         Coa_Trace.set_xlim([STIn,ENIn])
         Coa_Trace.get_xaxis().set_ticks([])
         Coa_Trace.yaxis.tick_right()
@@ -1173,7 +1173,7 @@ class SeisScan:
         self.lookup_table = lut_decimate
         
         # Define pre-pad as a function of the onset windows
-        self.pre_pad = sum(np.max(self.onset_win_p1[1],self.onset_win_s1[1]),3*np.max(self.onset_win_p1[0],self.onset_win_s1[0])))
+        self.pre_pad = max(self.onset_win_p1[1],self.onset_win_s1[1]) + 3*max(self.onset_win_p1[0],self.onset_win_s1[0])
         
         # Dectect the possible events from the decimated grid
         self._continious_compute(starttime,endtime)
@@ -1356,7 +1356,7 @@ class SeisScan:
         self.lookup_table = lut_decimate 
         
         # Define pre-pad as a function of the onset windows
-        self.pre_pad = sum(np.max(self.onset_win_p1[1],self.onset_win_s1[1]),3*np.max(self.onset_win_p1[0],self.onset_win_s1[0])))
+        self.pre_pad = max(self.onset_win_p1[1],self.onset_win_s1[1]) + 3*max(self.onset_win_p1[0],self.onset_win_s1[0])
         
         #
         Triggered = pd.DataFrame(columns=['DT','COA','X','Y','Z','ErrX','ErrY','ErrZ'])

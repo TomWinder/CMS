@@ -753,8 +753,8 @@ class LUT(Grid3D,NonLinLoc):
         ttp = np.zeros(ix.shape + (stn.shape[0],))
         tts = np.zeros(ix.shape + (stn.shape[0],))
 
-        gvp = np.interp(iz, -Z, VP)
-        gvs = np.interp(iz, -Z, VS)
+        gvp = np.interp(iz, Z, VP)
+        gvs = np.interp(iz, Z, VS)
 
 
 
