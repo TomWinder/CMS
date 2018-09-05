@@ -12,9 +12,9 @@ from copy import copy
 
 import numpy as np
 import pyproj
-from scipy.interpolate import RectBivariateSpline, RegularGridInterpolator, griddata
+from scipy.interpolate import RectBivariateSpline, RegularGridInterpolator, griddata, interp1d
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 import matplotlib.pylab as plt
 
 import subprocess
@@ -747,17 +747,21 @@ class LUT(Grid3D,NonLinLoc):
 
 
 
+
         stn = self.get_station_xyz()
         coord = self.get_grid_xyz()
         ix, iy, iz = self.get_grid_xyz(cells='all')
         ttp = np.zeros(ix.shape + (stn.shape[0],))
         tts = np.zeros(ix.shape + (stn.shape[0],))
 
-        gvp = np.interp(iz, Z, VP)
-        gvs = np.interp(iz, Z, VS)
+        Z  = np.insert(np.append(Z,-np.inf),0,np.inf)
+        VP = np.insert(np.append(VP,VP[-1]),0,VP[0])
+        VS = np.insert(np.append(VS,VS[-1]),0,VS[0])
 
-
-
+        f = interp1d(Z,VP)
+        gvp = f(iz)
+        f = interp1d(Z,VS)
+        gvs = f(iz)
 
 
         for s in range(stn.shape[0]):
@@ -774,43 +778,42 @@ class LUT(Grid3D,NonLinLoc):
 
         self.maps = {'TIME_P': ttp, 'TIME_S': tts}
 
+#    def compute_3DVelocity(self,INPUT_FILE):
+#        '''
+#            Function used to compute Travel-time tables in a 1D Velocity model
+#            defined using the input VP and VS arrays
 
-    def compute_3DVelocity(self,INPUT_FILE):
-        '''
-            Function used to compute Travel-time tables in a 1D Velocity model
-            defined using the input VP and VS arrays
-
-            INPUTS:
-                INPUT_FILE - File containg comma seperated X,Y,Z,VP,VS
-
-
-        '''
-        # Constructing the velocity model
-        #      Interpolating the velocity model to each point in the 3D grid. Defined Smoothing parameter based by
-
-        VEL = pd.read_csv(INPUT_FILE,names=['X','Y','Z','VP','VS'])
-
-        stn = self.get_station_xyz()
-        coord = self.get_grid_xyz()
-        ix, iy, iz = self.get_grid_xyz(cells='all')
-        ttp = np.zeros(ix.shape + (nstn,))
-        tts = np.zeros(ix.shape + (nstn,))
-
-        gvp = scipy.interpolate.griddata(VEL[['X','Y','Z']], VEL['VP'], (ix,iy,iz), 'linear')
-        gvs = scipy.interpolate.griddata(VEL[['X','Y','Z']], VEL['VP'], (ix,iy,iz), 'linear')
+#            INPUTS:
+#                INPUT_FILE - File containg comma seperated X,Y,Z,VP,VS
 
 
-        for s in range(stn.shape[0]):
-            print("Generating 1D Travel-Time Table - {}".format(i))
+#        '''
+#        # Constructing the velocity model
+#        #      Interpolating the velocity model to each point in the 3D grid. Defined Smoothing parameter based by
 
-            x = np.arange(min(coord[:,0]),max(coord[:,0]),self.cell_size[0])
-            y = np.arange(min(coord[:,1]),max(coord[:,1]),self.cell_size[1])
-            Z = np.arange(min(coord[:,2]),max(coord[:,2]),self.cell_size[2])
+#        VEL = pd.read_csv(INPUT_FILE,names=['X','Y','Z','VP','VS'])
 
-            ttp[..., p] = eikonal(x,y,z,gvp,stn[s][np.newaxis,:])[0]
-            tts[..., s] = eikonal(x,y,z,gvs,stn[s][np.newaxis,:])[0]
+#        stn = self.get_station_xyz()
+#        coord = self.get_grid_xyz()
+#        ix, iy, iz = self.get_grid_xyz(cells='all')
+#        ttp = np.zeros(ix.shape + (nstn,))
+#        tts = np.zeros(ix.shape + (nstn,))
 
-        self.maps = {'TIME_P': ttp1, 'TIME_S': tts}
+#        gvp = scipy.interpolate.griddata(VEL[['X','Y','Z']], VEL['VP'], (ix,iy,iz), 'linear')
+#        gvs = scipy.interpolate.griddata(VEL[['X','Y','Z']], VEL['VP'], (ix,iy,iz), 'linear')
+
+
+#        for s in range(stn.shape[0]):
+#            print("Generating 1D Travel-Time Table - {}".format(i))
+
+#            x = np.arange(min(coord[:,0]),max(coord[:,0]),self.cell_size[0])
+#            y = np.arange(min(coord[:,1]),max(coord[:,1]),self.cell_size[1])
+#            Z = np.arange(min(coord[:,2]),max(coord[:,2]),self.cell_size[2])
+
+#            ttp[..., p] = eikonal(x,y,z,gvp,stn[s][np.newaxis,:])[0]
+#            tts[..., s] = eikonal(x,y,z,gvs,stn[s][np.newaxis,:])[0]
+
+#        self.maps = {'TIME_P': ttp1, 'TIME_S': tts}
 
 
 

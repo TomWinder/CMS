@@ -1173,7 +1173,8 @@ class SeisScan:
         self.lookup_table = lut_decimate
         
         # Define pre-pad as a function of the onset windows
-        self.pre_pad = max(self.onset_win_p1[1],self.onset_win_s1[1]) + 3*max(self.onset_win_p1[0],self.onset_win_s1[0])
+        if self.pre_pad is None:
+            self.pre_pad = max(self.onset_win_p1[1],self.onset_win_s1[1]) + 3*max(self.onset_win_p1[0],self.onset_win_s1[0])
         
         # Dectect the possible events from the decimated grid
         self._continious_compute(starttime,endtime)
@@ -1356,7 +1357,8 @@ class SeisScan:
         self.lookup_table = lut_decimate 
         
         # Define pre-pad as a function of the onset windows
-        self.pre_pad = max(self.onset_win_p1[1],self.onset_win_s1[1]) + 3*max(self.onset_win_p1[0],self.onset_win_s1[0])
+        if self.pre_pad is None:
+            self.pre_pad = max(self.onset_win_p1[1],self.onset_win_s1[1]) + 3*max(self.onset_win_p1[0],self.onset_win_s1[0])
         
         #
         Triggered = pd.DataFrame(columns=['DT','COA','X','Y','Z','ErrX','ErrY','ErrZ'])
