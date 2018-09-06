@@ -1016,6 +1016,7 @@ class SeisScan:
         #dsnr = classic_sta_lta(np.exp((dsnr / nchan) - 1.0),self.onset_win_p1[0]*self.sample_rate*0.5,self.onset_win_p1[1]*self.sample_rate*0.5)
         dsnr = dsnr[pre_smp:pre_smp + nsamp]
 
+
         dloc  = self.lookup_table.index2xyz(dind[pre_smp:pre_smp + nsamp])
 
         MAP   = self._map[:,:,:,(pre_smp+1):pre_smp + nsamp]
@@ -1032,7 +1033,7 @@ class SeisScan:
         # 2. Defining the pre- and post- padding
         # 3.  
 
-        CoaV = 1.0
+        # CoaV = 1.0
 
         self.StartDateTime = datetime.strptime(starttime,'%Y-%m-%dT%H:%M:%S.%f')
         self.EndDateTime   = datetime.strptime(endtime,'%Y-%m-%dT%H:%M:%S.%f')
@@ -1062,16 +1063,18 @@ class SeisScan:
             dcoord = self.lookup_table.xyz2coord(dloc)
             self.output.FileSampleRate = self.Output_SampleRate
 
-            if i == 0:
-                CoaVp = dsnr + (CoaV-dsnr[0])
-                self.output.write_scan(daten[:-1],CoaVp[:-1],dcoord[:-1,:])
-                CoaV=CoaVp[-1]
-            else:
-                CoaVp = dsnr + (CoaV-dsnr[0])
-                self.output.write_scan(daten[:-1],CoaVp[:-1],dcoord[:-1,:])
-                CoaV=CoaVp[-1]
+            self.output.write_scan(daten[:-1],CoaVp[:-1],dcoord[:-1,:])
 
-            i += 1
+            # if i == 0:
+            #     CoaVp = dsnr + (CoaV-dsnr[0])
+            #     self.output.write_scan(daten[:-1],CoaVp[:-1],dcoord[:-1,:])
+            #     CoaV=CoaVp[-1]
+            # else:
+            #     CoaVp = dsnr + (CoaV-dsnr[0])
+            #     self.output.write_scan(daten[:-1],CoaVp[:-1],dcoord[:-1,:])
+            #     CoaV=CoaVp[-1]
+
+            # i += 1
 
 
 

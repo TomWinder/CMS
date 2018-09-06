@@ -53,8 +53,7 @@ class MSEED():
 
         # Since the traces are the same sample-rates then the stations can be selected based
         #on the start and end time
-        exSamples = (endT-stT).total_seconds()*self.sampling_rate + 1
-
+        exSamples = int((endT-stT).total_seconds()*self.sampling_rate + 1)
 
         stationAva = np.zeros((len(self.lookup_table.station_data['Name']),1))
         signal     = np.zeros((3,len(self.lookup_table.station_data['Name']),int(exSamples)))
@@ -63,7 +62,7 @@ class MSEED():
 
             tmp_st = st.select(station=self.lookup_table.station_data['Name'][i])
             if len(tmp_st) == 3:
-                if tmp_st[0].stats.npts == exSamples and tmp_st[1].stats.npts == exSamples and tmp_st[2].stats.npts == exSamples:
+                if tmp_st[0].stats.npts <= exSamples and tmp_st[1].stats.npts == exSamples and tmp_st[2].stats.npts == exSamples:
                     # Defining the station as avaliable
                     stationAva[i] = 1
                     
@@ -176,6 +175,7 @@ class MSEED():
 
 
                 # Combining the mseed and determining station avaliability
+
                 st.merge(fill_value='interpolate')
                 st.detrend('demean')
                 st = _downsample(st,sampling_rate)

@@ -14,7 +14,7 @@ import numpy as np
 import pyproj
 from scipy.interpolate import RectBivariateSpline, RegularGridInterpolator, griddata, interp1d
 import matplotlib
-#matplotlib.use('Agg')
+matplotlib.use('Agg')
 import matplotlib.pylab as plt
 
 import subprocess
@@ -91,7 +91,7 @@ def _proj_wgs84_utm(longitude):
     return pyproj.Proj("+proj=utm +zone={0:d} +datum=WGS84 +units=m +no_defs".format(zone))
 
 
-def eikonal(x,y,z,V,S):
+def eikonal(ix,iy,iz,dxi,dyi,dzi,V,S):
     '''
         Travel-Time formulation using a simple eikonal method.
         Requires the skifmm python package.
@@ -107,38 +107,10 @@ def eikonal(x,y,z,V,S):
             t - Travel-time numpy array
 
     '''
-    t=[]
-
-    dx = float(x[1]-x[0])
-    phi = -1*np.ones_like(V)
-
-    if S.ndim==1:
-        S=np.array([S]);
-        ns=1
-        ns, ndim = S.shape
-    else:
-        ns, ndim = S.shape
-
-    for i in range(ns):
-        # get location of source
-        #print(i)
-        ix = np.abs(x-S[i,0]).argmin();
-        if ndim>1:
-            iy = np.abs(y-S[i,1]).argmin();
-        if ndim>2:
-            iz = np.abs(z-S[i,2]).argmin();
-
-        if ndim>2:
-            phi[iy,ix,iz]=1;
-        elif ndim>1:
-            phi[iy,ix]=1;
-        else:
-            phi[ix]=1;
-
-        t_comp = skfmm.travel_time(phi, V, dx)
-
-        t.append(t_comp)
-
+    phi = -np.ones(ix.shape)
+    indx = np.argmin(abs((ix - S[:,0])) + abs((iy - S[:,1])) + abs((iz - S[:,2])))
+    phi[np.unravel_index(indx,ix.shape)] = 1.0
+    t = skfmm.travel_time(phi,V,dx=[dxi,dyi,dzi])
     return t
 
 
@@ -755,6 +727,7 @@ class LUT(Grid3D,NonLinLoc):
         tts = np.zeros(ix.shape + (stn.shape[0],))
 
         Z  = np.insert(np.append(Z,-np.inf),0,np.inf)
+        print(Z)
         VP = np.insert(np.append(VP,VP[-1]),0,VP[0])
         VS = np.insert(np.append(VS,VS[-1]),0,VS[0])
 
@@ -768,13 +741,13 @@ class LUT(Grid3D,NonLinLoc):
             print("Generating 1D Travel-Time Table - {} of {}".format(s+1,stn.shape[0]))
 
             x = np.arange(min(coord[:,0]),max(coord[:,0]),self.cell_size[0])
-            y = np.arange(min(coord[:,1]),max(coord[:,1]),self.cell_size[1])
+            y = -np.arange(min(coord[:,1]),max(coord[:,1]),self.cell_size[1])
             z = np.arange(min(coord[:,2]),max(coord[:,2]),self.cell_size[2])
 
             #print(eikonal(x,y,z,gvp,np.array([s])))
 
-            ttp[..., s] = eikonal(x,y,z,gvp,stn[s][np.newaxis,:])[0]
-            tts[..., s] = eikonal(x,y,z,gvs,stn[s][np.newaxis,:])[0]
+            ttp[..., s] = eikonal(ix,iy,iz,self.cell_size[0],self.cell_size[1],self.cell_size[2],gvp,stn[s][np.newaxis,:])
+            tts[..., s] = eikonal(ix,iy,iz,self.cell_size[0],self.cell_size[1],self.cell_size[2],gvs,stn[s][np.newaxis,:])
 
         self.maps = {'TIME_P': ttp, 'TIME_S': tts}
 
