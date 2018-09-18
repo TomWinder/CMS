@@ -90,6 +90,20 @@ def _proj_wgs84_utm(longitude):
     zone = _utm_zone(longitude)
     return pyproj.Proj("+proj=utm +zone={0:d} +datum=WGS84 +units=m +no_defs".format(zone))
 
+def _proj_wgs84_lambertcc(lon_Org,lat_Org,lat_1pl,lat_2pl):
+    return pyproj.Proj("+proj=lcc +lon_0={} +lat_0={} +lat_1={} +lat_2={} +datum=WGS84 +units=m +no_defs".format(float(lon_Org),float(lat_Org),float(lat_1pl),float(lat_2pl)))
+
+def _proj_wgs84_tm(lon_Org,lat_Org):
+    return pyproj.Proj("+proj=tmerc +lon_0={} +lat_0={} +datum=WGS84 +units=m +no_defs".format(float(lon_Org),float(lat_Org)))
+
+
+# def _proj_nlloc_simple(latOrg,lonOrg,rotAngle):
+#     x = (long - longOrig) * 111.111 * cos(lat_radians)
+#     y = (lat - latOrig) * 111.111
+#     lat = latOrig + y / 111.111
+#     long = longOrig + x / (111.111 * cos(lat_radians))
+#     x=(lon)
+
 
 def eikonal(ix,iy,iz,dxi,dyi,dzi,V,S):
     '''
@@ -135,6 +149,7 @@ class Grid3D:
         self.grid_dip = dip
         self.sort_order = sort_order
         self.UTM_zones_different = False
+        self.lcc_standard_parallels=(0.0,0.0)
 
     @property
     def grid_center(self):
@@ -216,6 +231,15 @@ class Grid3D:
             self._grid_proj = grid_proj
         self._update_coord()
 
+    def _nlloc_grid_proj(self):
+        if self.NLLoc_proj:
+            if self.NLLoc_proj == 'SIMPLE':
+                return "ERROR -- simple not yet supported"
+            elif self.NLLoc_proj == 'LAMBERT':
+                return _proj_wgs84_lambertcc(self.NLLoc_MapOrg[0],self.NLLoc_MapOrg[1],self.NLLoc_MapOrg[4],self.NLLoc_MapOrg[5])
+            elif self.NLLoc_proj == 'TRANS_MERC':
+                return _proj_wgs84_tm(self.NLLoc_MapOrg[0],self.NLLoc_MapOrg[1])
+
     def get_grid_proj(self):
         if self._grid_proj is None:
             warnings.warn("Grid Projection has not been set: Assuming WGS84")
@@ -252,17 +276,18 @@ class Grid3D:
     def get_NLLOC_gridcenter(self,NLLOCorg_lon,NLLOCorg_lat):
         self._longitude = NLLOCorg_lon
         self._coord_proj = _proj_wgs84()
-        self._grid_proj = _proj_wgs84_utm(self.longitude)
+        if self.NLLoc_proj is not 'NONE':
+            self._grid_proj = self._nlloc_grid_proj()
         self.grid_origin_xy=self.lonlat2xy(NLLOCorg_lon,NLLOCorg_lat)
         self._grid_center[0],self._grid_center[1]=(self.grid_origin_xy[0]+self.center[0],self.grid_origin_xy[1]+self.center[1])
         self._longitude,self._latitude=self.xy2lonlat(self._grid_center[0],self._grid_center[1])
-        if _utm_zone(self.longitude) != _utm_zone(NLLOCorg_lon):
-            self.UTM_zones_different=True
-            self._coord_proj = _proj_wgs84()
-            self._grid_proj = _proj_wgs84_utm(self.longitude)
-            self.grid_origin_xy=self.lonlat2xy(NLLOCorg_lon,NLLOCorg_lat)
-            self._grid_center[0],self._grid_center[1]=(self.grid_origin_xy[0]+self.center[0],self.grid_origin_xy[1]+self.center[1])
-            self._longitude,self._latitude=self.xy2lonlat(self._grid_center[0],self._grid_center[1])
+        # if _utm_zone(self.longitude) != _utm_zone(NLLOCorg_lon):
+        #     self.UTM_zones_different=True
+        #     self._coord_proj = _proj_wgs84()
+        #     self._grid_proj = _proj_wgs84_utm(self.longitude)
+        #     self.grid_origin_xy=self.lonlat2xy(NLLOCorg_lon,NLLOCorg_lat)
+        #     self._grid_center[0],self._grid_center[1]=(self.grid_origin_xy[0]+self.center[0],self.grid_origin_xy[1]+self.center[1])
+        #     self._longitude,self._latitude=self.xy2lonlat(self._grid_center[0],self._grid_center[1])
         self._update_grid_center()
 
     def set_lonlat(self, longitude=None, latitude=None, coord_proj=None, grid_proj=None):
@@ -276,9 +301,16 @@ class Grid3D:
             self._longitude = longitude
         self._update_grid_center()
 
-    def setproj_wgs84(self):
+    def setproj_wgs84(self,proj):
         self._coord_proj = _proj_wgs84()
-        self._grid_proj = _proj_wgs84_utm(self.longitude)
+        if proj == 'UTM':
+            self._grid_proj = _proj_wgs84_utm(self.longitude)
+        elif proj == 'LCC':
+            self._grid_proj = _proj_wgs84_lambertcc(self.longitude,self.latitude,self.lcc_standard_parallels[0],self.lcc_standard_parallels[1])
+        elif proj == 'TM':
+            self._grid_proj = _proj_wgs84_tm(self.longitude,self.latitude)
+        else:
+            raise Exception('Projection type must be specified! CMS currently supports UTM, LCC (Lambert Conical Conformic) or TM (Transverse Mercator)')
         if not self._update_grid_center():
             self._update_coord()
 
@@ -429,6 +461,10 @@ class NonLinLoc:
         if trans[1] == 'LAMBERT':
             self.NLLoc_proj    = 'LAMBERT'
             self.NLLoc_MapOrg  =  [trans[7],trans[5],trans[13],trans[3],trans[9],trans[11]]
+        if trans[1] == 'TRANS_MERC':
+            self.NLLoc_proj    = 'TRANS_MERC'
+            self.NLLoc_MapOrg  =  [trans[7],trans[5],trans[9],trans[3],'0.0','0.0']
+
 
 
         # Reading the buf file
@@ -443,7 +479,7 @@ class NonLinLoc:
             grids from NonLinLoc
         '''
 
-        # Generating the correct NonLinLoc Formated Grid
+        # Generating the correct NonLinLoc Formatted Grid
         if (self.NLLoc_proj == 'NONE'):
             GRID_NLLOC = Grid3D(center=(self.NLLoc_org + self.NLLoc_siz*self.NLLoc_n), cell_count=self.NLLoc_n,cell_size=self.NLLoc_siz,azimuth=0.0, dip=0.0, sort_order='C')
 
@@ -451,8 +487,12 @@ class NonLinLoc:
             GRID_NLLOC = Grid3D(center=(self.NLLoc_org + self.NLLoc_siz*self.NLLoc_n), cell_count=self.NLLoc_n,cell_size=self.NLLoc_siz,azimuth=self.NLLoc_MapOrg[2], dip=0.0, sort_order='C')
             GRID_NLLOC.set_lonlat(self.NLLoc_MapOrg[0],self.NLLoc_MapOrg[1])
 
-
         if (self.NLLoc_proj == 'LAMBERT'):
+            GRID_NLLOC = Grid3D(center=(self.NLLoc_org + self.NLLoc_siz*self.NLLoc_n), cell_count=self.NLLoc_n,cell_size=self.NLLoc_siz,azimuth=self.NLLoc_MapOrg[2], dip=0.0, sort_order='C')
+            GRID_NLLOC.set_lonlat(self.NLLoc_MapOrg[0],self.NLLoc_MapOrg[1])
+            GRID_NLLOC.set_proj(self.NLLoc_MapOrg[3])
+
+        if (self.NLLoc_proj == 'TRANS_MERC'):
             GRID_NLLOC = Grid3D(center=(self.NLLoc_org + self.NLLoc_siz*self.NLLoc_n), cell_count=self.NLLoc_n,cell_size=self.NLLoc_siz,azimuth=self.NLLoc_MapOrg[2], dip=0.0, sort_order='C')
             GRID_NLLOC.set_lonlat(self.NLLoc_MapOrg[0],self.NLLoc_MapOrg[1])
             GRID_NLLOC.set_proj(self.NLLoc_MapOrg[3])
@@ -488,6 +528,11 @@ class NonLinLoc:
             self.grid_center[2] = self.center[2]
 
         if (self.NLLoc_proj == 'LAMBERT'):
+            self.azimuth = float(self.NLLoc_MapOrg[2])
+            self.get_NLLOC_gridcenter(float(self.NLLoc_MapOrg[0]),float(self.NLLoc_MapOrg[1]))
+            self.grid_center[2] = self.center[2]
+
+        if (self.NLLoc_proj == 'TRANS_MERC'):
             self.azimuth = float(self.NLLoc_MapOrg[2])
             self.get_NLLOC_gridcenter(float(self.NLLoc_MapOrg[0]),float(self.NLLoc_MapOrg[1]))
             self.grid_center[2] = self.center[2]
@@ -727,7 +772,7 @@ class LUT(Grid3D,NonLinLoc):
         tts = np.zeros(ix.shape + (stn.shape[0],))
 
         Z  = np.insert(np.append(Z,-np.inf),0,np.inf)
-        print(Z)
+#        print(Z)
         VP = np.insert(np.append(VP,VP[-1]),0,VP[0])
         VS = np.insert(np.append(VS,VS[-1]),0,VS[0])
 
