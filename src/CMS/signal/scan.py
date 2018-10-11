@@ -285,14 +285,15 @@ class SeisPlot:
             CoalescenceMarginalizeLocation - 
 
     '''
-    def __init__(self,lut,MAP,DATA,EVENT,PlotOptions=None):
+    def __init__(self,lut,MAP,DATA,EVENT,StationPick,PlotOptions=None):
         '''
             This is the initial variatiables
         '''
-        self.LUT   = lut
-        self.DATA  = DATA
-        self.EVENT = EVENT
-        self.MAP   = MAP
+        self.LUT         = lut
+        self.DATA        = DATA
+        self.EVENT       = EVENT
+        self.MAP         = MAP
+        self.StationPick = StationPick
 
 
         if PlotOptions == None:
@@ -540,6 +541,74 @@ class SeisPlot:
         # self.CoaArriavalTP = Coa_Trace.scatter(TP,(np.arange(self.DATA.signal.shape[1])+1),15,'r',marker='v')
         # self.CoaArriavalTS = Coa_Trace.scatter(TS,(np.arange(self.DATA.signal.shape[1])+1),15,'b',marker='v')
 
+
+    def CoalescenceTrace(self,SaveFilename=None):
+
+
+        # Looping through all stations
+        for ii in range(self.DATA.signal.shape[1]): 
+
+            fig = plt.figure(figsize=(30,15))
+
+            # Defining the plot
+            fig.patch.set_facecolor('white')
+            XTrace_Seis  =  plt.subplot(321)
+            YTrace_Seis  =  plt.subplot(322)
+            ZTrace_Seis  =  plt.subplot(323)
+            P_Onset      =  plt.subplot(324)
+            S_Onset      =  plt.subplot(325)
+
+
+            # Plotting the X-trace
+            XTrace_Seis.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.signal[0,ii,:]/np.max(abs(self.DATA.signal[0,ii,:])))*self.TraceScaling,'r',linewidth=0.5)
+            YTrace_Seis.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.signal[1,ii,:]/np.max(abs(self.DATA.signal[1,ii,:])))*self.TraceScaling,'b',linewidth=0.5)
+            ZTrace_Seis.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.signal[2,ii,:]/np.max(abs(self.DATA.signal[2,ii,:])))*self.TraceScaling,'g',linewidth=0.5)
+            P_Onset.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.SNR_P[0,ii,:]/np.max(abs(self.DATA.signal[0,ii,:])))*self.TraceScaling,'r',linewidth=0.5)
+            S_Onset.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.SNR_S[1,ii,:]/np.max(abs(self.DATA.signal[1,ii,:])))*self.TraceScaling,'b',linewidth=0.5)
+
+
+            # Defining Pick and Error
+            STATION = self.StationPick[self.StationPick == self.LUT.station_data['Name'][ii]]
+
+            for jj in range(len(STATION)):
+                if STATION['Phase'].iloc[jj] == 'P':
+                    ZTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
+                    ZTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
+                    ZTrace_Seis.axvline(pd.to_datetime(STATION['PickTime']))
+
+                    P_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
+                    P_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
+                    P_Onset.axvline(pd.to_datetime(STATION['PickTime']))
+
+                else:
+                    YTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
+                    YTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
+                    YTrace_Seis.axvline(pd.to_datetime(STATION['PickTime']))
+
+                    XTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
+                    XTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
+                    XTrace_Seis.axvline(pd.to_datetime(STATION['PickTime']))
+
+                    S_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
+                    S_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
+                    S_Onset.axvline(pd.to_datetime(STATION['PickTime']))
+
+
+            # Refining the window as around the pick time
+            MINT = STATION['PickTime'].min() + timedelta(seconds=-2*STATION['PickError'].max())
+            MAXT = STATION['PickTime'].max() + timedelta(seconds=-2*STATION['PickError'].max())
+
+            XTrace_Seis.set_xlim([MINT,MAXT])
+            YTrace_Seis.set_xlim([MINT,MAXT])
+            ZTrace_Seis.set_xlim([MINT,MAXT])
+            P_Onset.set_xlim([MINT,MAXT])
+            S_Onset.set_xlim([MINT,MAXT])
+            
+            if SaveFilename == None:
+               plt.show()
+            else:
+               ani.save('{}_CoalescenceTrace_{}.pdf'.format(SaveFilename,self.LUT.station_data['Name'][ii]),writer=writer)
+            
 
     def CoalescenceVideo(self,SaveFilename=None):
         STIn = np.where(self.times == self.EVENT['DT'].iloc[0])[0][0]
@@ -892,6 +961,7 @@ class SeisScan:
         self.CoalescenceGrid    = False
         self.CoalescenceVideo   = False
         self.CoalescencePicture = False
+        self.CoalescenceTrace   = False
         self.PickingType        = 'Gaussian'
         self.LocationError      = 0.95
 
@@ -1300,6 +1370,8 @@ class SeisScan:
         # Saving the output from the triggered events
         self.output.write_stationsfile(STATIONS,EventName)
 
+        return STATIONS
+
 
     def _ErrorEllipse(self,COA3D):
         """
@@ -1421,7 +1493,7 @@ class SeisScan:
             self.EVENT_max = self.EVENT.iloc[np.argmax(self.EVENT['COA'])]
 
             # Determining the hypocentral location from the maximum over the marginal window.
-            self._ArrivalTrigger(self.EVENT.iloc[np.argmax(self.EVENT['COA'])],(EVENTS['EventID'].iloc[e].astype(str)))
+            StationPick = self._ArrivalTrigger(self.EVENT.iloc[np.argmax(self.EVENT['COA'])],(EVENTS['EventID'].iloc[e].astype(str)))
 
             # Determining earthquake location error
             LOC,LOC_ERR = self._LocationError(self.MAP)
@@ -1430,17 +1502,21 @@ class SeisScan:
             self.output.write_event(EV,str(EVENTS['EventID'].iloc[e].astype(str)))
 
             # Outputting coalescence grids and triggered events
+            if self.CoalescenceTrace == True:
+                SeisPLT = SeisPlot(self.lookup_table,self.MAP,self.DATA,self.EVENT,StationPick)
+                SeisPLT.CoalescenceTrace(SaveFilename='{}_{}'.format(path.join(self.output.path, self.output.name),EVENTS['EventID'].iloc[e].astype(str)))
+
             if self.CoalescenceGrid == True:
                 self.output.write_coal4D(MAP,e,cstart,cend)
 
 
             if self.CoalescenceVideo == True:
-                SeisPLT = SeisPlot(self.lookup_table,self.MAP,self.DATA,self.EVENT)
+                SeisPLT = SeisPlot(self.lookup_table,self.MAP,self.DATA,self.EVENT,StationPick)
                 SeisPLT.CoalescenceVideo(SaveFilename='{}_{}'.format(path.join(self.output.path, self.output.name),EVENTS['EventID'].iloc[e].astype(str)))
 
 
             if self.CoalescencePicture == True:
-                SeisPLT = SeisPlot(self.lookup_table,self.MAP,self.DATA,self.EVENT)
+                SeisPLT = SeisPlot(self.lookup_table,self.MAP,self.DATA,self.EVENT,StationPick)
                 SeisPLT.CoalescenceMarginal(SaveFilename='{}_{}'.format(path.join(self.output.path, self.output.name),EVENTS['EventID'].iloc[e].astype(str)))
 
             self.MAP    = None
