@@ -547,67 +547,94 @@ class SeisPlot:
 
         # Looping through all stations
         for ii in range(self.DATA.signal.shape[1]): 
+            try:
+                fig = plt.figure(figsize=(30,15))
 
-            fig = plt.figure(figsize=(30,15))
-
-            # Defining the plot
-            fig.patch.set_facecolor('white')
-            XTrace_Seis  =  plt.subplot(321)
-            YTrace_Seis  =  plt.subplot(322)
-            ZTrace_Seis  =  plt.subplot(323)
-            P_Onset      =  plt.subplot(324)
-            S_Onset      =  plt.subplot(325)
-
-
-            # Plotting the X-trace
-            XTrace_Seis.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.signal[0,ii,:]/np.max(abs(self.DATA.signal[0,ii,:])))*self.TraceScaling,'r',linewidth=0.5)
-            YTrace_Seis.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.signal[1,ii,:]/np.max(abs(self.DATA.signal[1,ii,:])))*self.TraceScaling,'b',linewidth=0.5)
-            ZTrace_Seis.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.signal[2,ii,:]/np.max(abs(self.DATA.signal[2,ii,:])))*self.TraceScaling,'g',linewidth=0.5)
-            P_Onset.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.SNR_P[0,ii,:]/np.max(abs(self.DATA.signal[0,ii,:])))*self.TraceScaling,'r',linewidth=0.5)
-            S_Onset.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.SNR_S[1,ii,:]/np.max(abs(self.DATA.signal[1,ii,:])))*self.TraceScaling,'b',linewidth=0.5)
+                # Defining the plot
+                fig.patch.set_facecolor('white')
+                XTrace_Seis  =  plt.subplot(322)
+                YTrace_Seis  =  plt.subplot(324)
+                ZTrace_Seis  =  plt.subplot(321)
+                P_Onset      =  plt.subplot(323)
+                S_Onset      =  plt.subplot(326)
 
 
-            # Defining Pick and Error
-            STATION = self.StationPick[self.StationPick == self.LUT.station_data['Name'][ii]]
+                # Plotting the X-trace
+                XTrace_Seis.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.FilteredSignal[0,ii,:]/np.max(abs(self.DATA.FilteredSignal[0,ii,:])))*self.TraceScaling,'r',linewidth=0.5)
+                YTrace_Seis.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.FilteredSignal[1,ii,:]/np.max(abs(self.DATA.FilteredSignal[1,ii,:])))*self.TraceScaling,'b',linewidth=0.5)
+                ZTrace_Seis.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.FilteredSignal[2,ii,:]/np.max(abs(self.DATA.FilteredSignal[2,ii,:])))*self.TraceScaling,'g',linewidth=0.5)
+                P_Onset.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.SNR_P[ii,:]/np.max(abs(self.DATA.SNR_P[ii,:])))*self.TraceScaling,'r',linewidth=0.5)
+                S_Onset.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.SNR_S[ii,:]/np.max(abs(self.DATA.SNR_S[ii,:])))*self.TraceScaling,'b',linewidth=0.5)
 
-            for jj in range(len(STATION)):
-                if STATION['Phase'].iloc[jj] == 'P':
-                    ZTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
-                    ZTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
-                    ZTrace_Seis.axvline(pd.to_datetime(STATION['PickTime']))
 
-                    P_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
-                    P_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
-                    P_Onset.axvline(pd.to_datetime(STATION['PickTime']))
+                # Defining Pick and Error
+                PICKS_df = self.StationPick['Pick']
+                STATION = PICKS_df[PICKS_df['Name'] == self.LUT.station_data['Name'][ii]].reset_index(drop=True)
+                #print(STATION)
+                STATION = STATION.replace('-1.0',np.nan)
 
+                #print(STATION)
+                #print(STATION['PickError'].iloc[0],STATION['PickError'].iloc[1])
+
+
+                if np.isnan(STATION['PickError'].iloc[0]) and np.isnan(STATION['PickError'].iloc[1]):
+                    continue
+
+
+                for jj in range(len(STATION)):
+                    if np.isnan(STATION['PickError'].iloc[jj]):
+                        continue 
+
+                    if STATION['Phase'].iloc[jj] == 'P':
+                        ZTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
+                        ZTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
+                        ZTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj]))
+
+                        # S_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
+                        # S_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
+                        # S_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj]))
+
+                        # yy = gaussian_func(self.StationPick['GAU_P'][ii]['xdata'],self.StationPick['GAU_P'][ii]['popt'][0],self.StationPick['GAU_P'][ii]['popt'][1],self.StationPick['GAU_P'][ii]['popt'][2])
+                        # P_Onset.plot(self.StationPick['GAU_P'][ii]['xdata_dt'],yy)
+                        P_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
+                        P_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
+                        P_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj]))
+
+
+
+                    else:
+                        YTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
+                        YTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
+                        YTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj]))
+
+                        XTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
+                        XTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
+                        XTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj]))
+
+                        # yy = gaussian_func(self.StationPick['GAU_S'][ii]['xdata'],self.StationPick['GAU_S'][ii]['popt'][0],self.StationPick['GAU_S'][ii]['popt'][1],self.StationPick['GAU_S'][ii]['popt'][2])
+                        # S_Onset.plot(self.StationPick['GAU_S'][ii]['xdata_dt'],yy)
+
+                        S_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
+                        S_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
+                        S_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj]))
+
+
+                # Refining the window as around the pick time
+                MINT = pd.to_datetime(STATION['ModelledTime'].min()) - (pd.to_datetime(STATION['ModelledTime'].max()) - pd.to_datetime(STATION['ModelledTime'].min()))
+                MAXT = pd.to_datetime(STATION['ModelledTime'].max()) + (pd.to_datetime(STATION['ModelledTime'].max()) - pd.to_datetime(STATION['ModelledTime'].min()))
+
+                XTrace_Seis.set_xlim([MINT,MAXT])
+                YTrace_Seis.set_xlim([MINT,MAXT])
+                ZTrace_Seis.set_xlim([MINT,MAXT])
+                P_Onset.set_xlim([MINT,MAXT])
+                S_Onset.set_xlim([MINT,MAXT])
+                
+                if SaveFilename == None:
+                   plt.show()
                 else:
-                    YTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
-                    YTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
-                    YTrace_Seis.axvline(pd.to_datetime(STATION['PickTime']))
-
-                    XTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
-                    XTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
-                    XTrace_Seis.axvline(pd.to_datetime(STATION['PickTime']))
-
-                    S_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
-                    S_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
-                    S_Onset.axvline(pd.to_datetime(STATION['PickTime']))
-
-
-            # Refining the window as around the pick time
-            MINT = STATION['PickTime'].min() + timedelta(seconds=-2*STATION['PickError'].max())
-            MAXT = STATION['PickTime'].max() + timedelta(seconds=-2*STATION['PickError'].max())
-
-            XTrace_Seis.set_xlim([MINT,MAXT])
-            YTrace_Seis.set_xlim([MINT,MAXT])
-            ZTrace_Seis.set_xlim([MINT,MAXT])
-            P_Onset.set_xlim([MINT,MAXT])
-            S_Onset.set_xlim([MINT,MAXT])
-            
-            if SaveFilename == None:
-               plt.show()
-            else:
-               ani.save('{}_CoalescenceTrace_{}.pdf'.format(SaveFilename,self.LUT.station_data['Name'][ii]),writer=writer)
+                   plt.savefig('{}_CoalescenceTrace_{}.pdf'.format(SaveFilename,self.LUT.station_data['Name'][ii]))
+            except:
+                print('PDF not created for Station={}'.format(self.LUT.station_data['Name'][ii]))
             
 
     def CoalescenceVideo(self,SaveFilename=None):
@@ -1313,8 +1340,18 @@ class SeisScan:
 
         data_half_range = int(1.25*sampling_rate/(lowfreq)) # half range number of indices to fit guassian over (for 1 wavelengths of lowest frequency component)
         x_data = np.arange(trig_idx-data_half_range, trig_idx+data_half_range,dtype=float)/sampling_rate # x data, in seconds
+
         y_data = SNR[int(trig_idx-data_half_range):int(trig_idx+data_half_range)] # +/- one wavelength of lowest frequency around trigger
         p0 = [np.amax(SNR), float(trig_idx)/sampling_rate, 1./(lowfreq/4.)] # Initial guess (should work for any sampling rate and frequency)
+
+        d = 0
+        for jj in range(len(x_data)):
+            if d == 0:
+                XDATA = cstart + timedelta(seconds=x_data[jj])
+                d+=1
+            else:
+                XDATA = np.hstack((XDATA,(cstart + timedelta(seconds=x_data[jj]))))
+
         
         try:
             popt, pcov = curve_fit(gaussian_func, x_data, y_data, p0) # Fit gaussian to data
@@ -1322,12 +1359,23 @@ class SeisScan:
 
             # Mean is popt[1]. x_data[0] + popt[1] (In seconds)
             mean = cstart + timedelta(seconds=float(popt[1]))
+
+            GAU_FITS = {}
+            GAU_FITS['popt'] = popt
+            GAU_FITS['xdata'] = x_data
+            GAU_FITS['xdata_dt'] = XDATA
+
             #print(mean)
         except:
+            GAU_FITS = {}
+            GAU_FITS['popt'] = np.zeros((3))
+            GAU_FITS['xdata'] = np.zeros(x_data.shape)
+            GAU_FITS['xdata_dt'] = np.zeros(XDATA.shape)
+
             sigma = -1
             mean  = -1
 
-        return sigma,mean
+        return GAU_FITS,sigma,mean
 
 
 
@@ -1344,14 +1392,20 @@ class SeisScan:
         tts = self.lookup_table.value_at('TIME_S', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()]))).astype(int))[0]
         # Determining the stations that can be picked on and the phasese
         STATIONS=pd.DataFrame(columns=['Name','Phase','ModelledTime','PickTime','PickError'])
+        c=0
+        d=0
         for s in range(len(SNR_P)):
             if np.nansum(SNR_P[s]) !=  0:
                 stationEventPT = EVENT_MaxCoa['DT'] + timedelta(seconds=ttp[s])
 
                 if self.PickingType == 'Gaussian':
-                    Err,Mn = self._GaussianTrigger(SNR_P[s],'P',self.DATA.startTime,stationEventPT.to_pydatetime())
+                    GauInfoP,Err,Mn = self._GaussianTrigger(SNR_P[s],'P',self.DATA.startTime,stationEventPT.to_pydatetime())
 
-
+                if c==0:
+                    GAUP = GauInfoP
+                    c+=1
+                else:
+                    GAUP = np.hstack((GAUP,GauInfoP))
                 
                 tmpSTATION = pd.DataFrame([[self.lookup_table.station_data['Name'][s],'P',stationEventPT,Mn,Err,SNR_P[s]]],columns=['Name','Phase','ModelledTime','PickTime','PickError','PickSNR'])
                 STATIONS = STATIONS.append(tmpSTATION)
@@ -1361,7 +1415,14 @@ class SeisScan:
                 stationEventST = EVENT_MaxCoa['DT'] + timedelta(seconds=tts[s])
 
                 if self.PickingType == 'Gaussian':
-                    Err,Mn = self._GaussianTrigger(SNR_S[s],'S',self.DATA.startTime,stationEventST.to_pydatetime())
+                    GauInfoS,Err,Mn = self._GaussianTrigger(SNR_S[s],'S',self.DATA.startTime,stationEventST.to_pydatetime())
+
+
+                if d==0:
+                    GAUS = GauInfoS
+                    d+=1
+                else:
+                    GAUS = np.hstack((GAUS,GauInfoS))
 
                 tmpSTATION = pd.DataFrame([[self.lookup_table.station_data['Name'][s],'S',stationEventST,Mn,Err,SNR_S[s]]],columns=['Name','Phase','ModelledTime','PickTime','PickError','PickSNR'])
                 STATIONS = STATIONS.append(tmpSTATION)
@@ -1370,7 +1431,7 @@ class SeisScan:
         # Saving the output from the triggered events
         self.output.write_stationsfile(STATIONS,EventName)
 
-        return STATIONS
+        return STATIONS,GAUP,GAUS
 
 
     def _ErrorEllipse(self,COA3D):
@@ -1493,7 +1554,12 @@ class SeisScan:
             self.EVENT_max = self.EVENT.iloc[np.argmax(self.EVENT['COA'])]
 
             # Determining the hypocentral location from the maximum over the marginal window.
-            StationPick = self._ArrivalTrigger(self.EVENT.iloc[np.argmax(self.EVENT['COA'])],(EVENTS['EventID'].iloc[e].astype(str)))
+            Picks,GAUP,GAUS = self._ArrivalTrigger(self.EVENT.iloc[np.argmax(self.EVENT['COA'])],(EVENTS['EventID'].iloc[e].astype(str)))
+
+            StationPick = {}
+            StationPick['Pick'] = Picks
+            StationPick['GAU_P'] = GAUP
+            StationPick['GAU_S'] = GAUS
 
             # Determining earthquake location error
             LOC,LOC_ERR = self._LocationError(self.MAP)

@@ -56,7 +56,7 @@ class MSEED():
 
         # Since the traces are the same sample-rates then the stations can be selected based
         #on the start and end time
-        exSamples = int((endT-stT).total_seconds()*self.sampling_rate + 1)
+        exSamples = round((endT-stT).total_seconds()*self.sampling_rate + 1)
 
         stationAva = np.zeros((len(self.StationInformation['Name']),1))
         signal     = np.zeros((3,len(self.StationInformation['Name']),int(exSamples)))
