@@ -58,11 +58,13 @@ def onset(sig, stw, ltw):
     # assert isinstance(snr, object)
     nchan, nsamp = sig.shape
     snr = np.copy(sig)
+    snr_raw = np.copy(sig)
     for ch in range(0, nchan):
-        snr[ch, :] = classic_sta_lta(sig[ch, :], stw, ltw)
+        snr[ch, :] = classic_sta_lta(sig[ch, :]+1.0, stw, ltw)
+        snr_raw[ch, :] = snr[ch, :]
         np.clip(1+snr[ch,:],0.8,np.inf,snr[ch, :])
         np.log(snr[ch, :], snr[ch, :])
-    return snr
+    return snr_raw,snr
 
 
 def filter(sig,srate,lc,hc,order=3):
@@ -255,7 +257,7 @@ class SeisOutFile:
         filename = path.join(self.path,self.name)
 
         SeisPLT = SeisPlot(MAP,lookup_table,DATA,EventCoaVal)
-	
+    
         SeisPLT.CoalescenceVideo(SaveFilename='{}_{}'.format(filename,EventName))
         SeisPLT.CoalescenceMarginal(SaveFilename='{}_{}'.format(filename,EventName))
 
@@ -454,12 +456,12 @@ class SeisPlot:
             Coa_XYSlice.annotate(txt,[self.LUT.station_data['Longitude'][i],self.LUT.station_data['Latitude'][i]])
 
 
-	#  ------------- Plotting the XYFiles -----------
+    #  ------------- Plotting the XYFiles -----------
         if self.XYFiles != None:
            XYFiles = pd.read_csv(self.XYFiles,names=['File','Color','Linewidth','Linestyle'])
            c=0
            for ff in XYFiles['File']:
-                XYF = pd.read_csv(ff,names=['X','Y'])		
+                XYF = pd.read_csv(ff,names=['X','Y'])       
                 Coa_XYSlice.plot(XYF['X'],XYF['Y'],linestyle=XYFiles['Linestyle'].iloc[c],linewidth=XYFiles['Linewidth'].iloc[c],color=XYFiles['Color'].iloc[c])
                 c+=1
 
@@ -544,6 +546,19 @@ class SeisPlot:
 
     def CoalescenceTrace(self,SaveFilename=None):
 
+        # Determining the maginal window value from the coalescence function
+        mMAP = self.MAP
+        mMAP = np.log(np.sum(np.exp(mMAP),axis=-1))
+        mMAP = mMAP/np.max(mMAP)
+        mMAP_Cutoff = np.percentile(mMAP,95)
+        mMAP[mMAP < mMAP_Cutoff] = mMAP_Cutoff 
+        mMAP = mMAP - mMAP_Cutoff 
+        mMAP = mMAP/np.max(mMAP)
+        indexVal = np.where(mMAP == np.max(mMAP))
+        indexCoord = self.LUT.xyz2coord(self.LUT.loc2xyz(np.array([[indexVal[0][0],indexVal[1][0],indexVal[2][0]]])))
+
+
+
 
         # Looping through all stations
         for ii in range(self.DATA.signal.shape[1]): 
@@ -563,8 +578,8 @@ class SeisPlot:
                 XTrace_Seis.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.FilteredSignal[0,ii,:]/np.max(abs(self.DATA.FilteredSignal[0,ii,:])))*self.TraceScaling,'r',linewidth=0.5)
                 YTrace_Seis.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.FilteredSignal[1,ii,:]/np.max(abs(self.DATA.FilteredSignal[1,ii,:])))*self.TraceScaling,'b',linewidth=0.5)
                 ZTrace_Seis.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.FilteredSignal[2,ii,:]/np.max(abs(self.DATA.FilteredSignal[2,ii,:])))*self.TraceScaling,'g',linewidth=0.5)
-                P_Onset.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.SNR_P[ii,:]/np.max(abs(self.DATA.SNR_P[ii,:])))*self.TraceScaling,'r',linewidth=0.5)
-                S_Onset.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.SNR_S[ii,:]/np.max(abs(self.DATA.SNR_S[ii,:])))*self.TraceScaling,'b',linewidth=0.5)
+                P_Onset.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),self.DATA.SNR_P[ii,:],'r',linewidth=0.5)
+                S_Onset.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),self.DATA.SNR_S[ii,:],'b',linewidth=0.5)
 
 
                 # Defining Pick and Error
@@ -594,11 +609,14 @@ class SeisPlot:
                         # S_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
                         # S_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj]))
 
-                        # yy = gaussian_func(self.StationPick['GAU_P'][ii]['xdata'],self.StationPick['GAU_P'][ii]['popt'][0],self.StationPick['GAU_P'][ii]['popt'][1],self.StationPick['GAU_P'][ii]['popt'][2])
-                        # P_Onset.plot(self.StationPick['GAU_P'][ii]['xdata_dt'],yy)
+                        yy = gaussian_func(self.StationPick['GAU_P'][ii]['xdata'],self.StationPick['GAU_P'][ii]['popt'][0],self.StationPick['GAU_P'][ii]['popt'][1],self.StationPick['GAU_P'][ii]['popt'][2])
+                        P_Onset.plot(self.StationPick['GAU_P'][ii]['xdata_dt'],yy)
                         P_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
                         P_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
                         P_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj]))
+
+                        ZTrace_Seis.axvline(self.EVENT['DT'].iloc[np.argmax(self.EVENT['COA'])] + timedelta(seconds=self.LUT.get_value_at('TIME_P',np.array([indexVal[0][0],indexVal[1][0],indexVal[2][0]]))[0][ii]),color='red')
+                        P_Onset.axvline(self.EVENT['DT'].iloc[np.argmax(self.EVENT['COA'])] + timedelta(seconds=self.LUT.get_value_at('TIME_P',np.array([indexVal[0][0],indexVal[1][0],indexVal[2][0]]))[0][ii]),color='red')
 
 
 
@@ -611,17 +629,21 @@ class SeisPlot:
                         XTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
                         XTrace_Seis.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj]))
 
-                        # yy = gaussian_func(self.StationPick['GAU_S'][ii]['xdata'],self.StationPick['GAU_S'][ii]['popt'][0],self.StationPick['GAU_S'][ii]['popt'][1],self.StationPick['GAU_S'][ii]['popt'][2])
-                        # S_Onset.plot(self.StationPick['GAU_S'][ii]['xdata_dt'],yy)
+                        yy = gaussian_func(self.StationPick['GAU_S'][ii]['xdata'],self.StationPick['GAU_S'][ii]['popt'][0],self.StationPick['GAU_S'][ii]['popt'][1],self.StationPick['GAU_S'][ii]['popt'][2])
+                        S_Onset.plot(self.StationPick['GAU_S'][ii]['xdata_dt'],yy)
 
                         S_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=-STATION['PickError'].iloc[jj]/2),linestyle='--')
                         S_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj])+timedelta(seconds=+STATION['PickError'].iloc[jj]/2),linestyle='--')
                         S_Onset.axvline(pd.to_datetime(STATION['PickTime'].iloc[jj]))
 
+                        YTrace_Seis.axvline(self.EVENT['DT'].iloc[np.argmax(self.EVENT['COA'])] + timedelta(seconds=self.LUT.get_value_at('TIME_S',np.array([indexVal[0][0],indexVal[1][0],indexVal[2][0]]))[0][ii]),color='red')
+                        XTrace_Seis.axvline(self.EVENT['DT'].iloc[np.argmax(self.EVENT['COA'])] + timedelta(seconds=self.LUT.get_value_at('TIME_S',np.array([indexVal[0][0],indexVal[1][0],indexVal[2][0]]))[0][ii]),color='red')
+                        S_Onset.axvline(self.EVENT['DT'].iloc[np.argmax(self.EVENT['COA'])] + timedelta(seconds=self.LUT.get_value_at('TIME_S',np.array([indexVal[0][0],indexVal[1][0],indexVal[2][0]]))[0][ii]),color='red')
 
+                        
                 # Refining the window as around the pick time
-                MINT = pd.to_datetime(STATION['ModelledTime'].min()) - (pd.to_datetime(STATION['ModelledTime'].max()) - pd.to_datetime(STATION['ModelledTime'].min()))
-                MAXT = pd.to_datetime(STATION['ModelledTime'].max()) + (pd.to_datetime(STATION['ModelledTime'].max()) - pd.to_datetime(STATION['ModelledTime'].min()))
+                MINT = pd.to_datetime(STATION['ModelledTime'].min()) - 2*(pd.to_datetime(STATION['ModelledTime'].max()) - pd.to_datetime(STATION['ModelledTime'].min()))
+                MAXT = pd.to_datetime(STATION['ModelledTime'].max()) + 2*(pd.to_datetime(STATION['ModelledTime'].max()) - pd.to_datetime(STATION['ModelledTime'].min()))
 
                 XTrace_Seis.set_xlim([MINT,MAXT])
                 YTrace_Seis.set_xlim([MINT,MAXT])
@@ -662,14 +684,22 @@ class SeisPlot:
 
         '''
 
-
-
         TimeSliceIndex = np.where(self.times == self.EVENT['DT'].iloc[np.argmax(self.EVENT['COA'])])[0][0]
         TimeSlice = self.times[TimeSliceIndex]
         index = np.where(self.EVENT['DT'] == TimeSlice)[0][0]
         indexVal1 = self.LUT.coord2loc(np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]])).astype(int)[0]
         indexCoord = np.array([[self.EVENT['X'].iloc[index],self.EVENT['Y'].iloc[index],self.EVENT['Z'].iloc[index]]])[0,:]
 
+        # Determining the maginal window value from the coalescence function
+        mMAP = self.MAP
+        mMAP = np.log(np.sum(np.exp(mMAP),axis=-1))
+        mMAP = mMAP/np.max(mMAP)
+        mMAP_Cutoff = np.percentile(mMAP,95)
+        mMAP[mMAP < mMAP_Cutoff] = mMAP_Cutoff 
+        mMAP = mMAP - mMAP_Cutoff 
+        mMAP = mMAP/np.max(mMAP)
+        indexVal = np.where(mMAP == np.max(mMAP))
+        indexCoord = self.LUT.xyz2coord(self.LUT.loc2xyz(np.array([[indexVal[0][0],indexVal[1][0],indexVal[2][0]]])))
 
 
         # Defining the plots to be represented
@@ -682,16 +712,6 @@ class SeisPlot:
         Coa_Logo     =  plt.subplot2grid((3, 5), (2, 2))
         Coa_CoaVal   =  plt.subplot2grid((3, 5), (2, 3), colspan=2)
 
-        # Determining the maginal window value from the coalescence function
-        mMAP = self.MAP
-        mMAP = np.log(np.sum(np.exp(mMAP),axis=-1))
-        mMAP = mMAP/np.max(mMAP)
-        mMAP_Cutoff = np.percentile(mMAP,95)
-        mMAP[mMAP < mMAP_Cutoff] = mMAP_Cutoff 
-        mMAP = mMAP - mMAP_Cutoff 
-        mMAP = mMAP/np.max(mMAP)
-        indexVal = np.where(mMAP == np.max(mMAP))
-        indexCoord = self.LUT.xyz2coord(self.LUT.loc2xyz(np.array([[indexVal[0][0],indexVal[1][0],indexVal[2][0]]])))
 
 
         # ---------------- Plotting the Traces -----------
@@ -785,19 +805,19 @@ class SeisPlot:
         Coa_XZSlice.axvline(x=indexCoord[0][2],linestyle='--',linewidth=2,color=self.LineStationColor)
         Coa_XZSlice.axhline(y=indexCoord[0][1],linestyle='--',linewidth=2,color=self.LineStationColor)
 
-	    # Plotting the station locations
+        # Plotting the station locations
         Coa_XYSlice.scatter(self.LUT.station_data['Longitude'],self.LUT.station_data['Latitude'],15,marker='^',color=self.LineStationColor)
         Coa_YZSlice.scatter(self.LUT.station_data['Longitude'],self.LUT.station_data['Elevation'],15,marker='^',color=self.LineStationColor)
         Coa_XZSlice.scatter(self.LUT.station_data['Elevation'],self.LUT.station_data['Latitude'],15,marker='<',color=self.LineStationColor)
         for i,txt in enumerate(self.LUT.station_data['Name']):
             Coa_XYSlice.annotate(txt,[self.LUT.station_data['Longitude'][i],self.LUT.station_data['Latitude'][i]],color=self.LineStationColor)
 
-	    # Plotting the XYFiles
+        # Plotting the XYFiles
         if self.XYFiles != None:
            XYFiles = pd.read_csv(self.XYFiles,names=['File','Color','Linewidth','Linestyle'])
            c=0
            for ff in XYFiles['File']:
-                XYF = pd.read_csv(ff,names=['X','Y'])		
+                XYF = pd.read_csv(ff,names=['X','Y'])       
                 Coa_XYSlice.plot(XYF['X'],XYF['Y'],linestyle=XYFiles['Linestyle'].iloc[c],linewidth=XYFiles['Linewidth'].iloc[c],color=XYFiles['Color'].iloc[c])
                 c+=1
 
@@ -1022,9 +1042,9 @@ class SeisScan:
         ltw = int(ltw * srate) + 1               # Changes the onset window to actual samples
         sig_z = self._pre_proc_p1(sig_z, srate)  # Apply the pre-processing defintion
         self.filt_data['sigz'] = sig_z           # defining the data to pass 
-        sig_z = onset(sig_z, stw, ltw)           # Determine the onset function using definition
+        sig_z_raw,sig_z = onset(sig_z, stw, ltw)           # Determine the onset function using definition
         self.onset_data['sigz'] = sig_z          # Define the onset function from the data 
-        return sig_z
+        return sig_z_raw,sig_z
 
     def _compute_onset_s1(self, sig_e, sig_n, srate):
         stw, ltw = self.onset_win_s1                                            # Define the STW and LTW for the onset function
@@ -1033,13 +1053,14 @@ class SeisScan:
         sig_e, sig_n = self._pre_proc_s1(sig_e, sig_n, srate)                   # Apply the pre-processing defintion
         self.filt_data['sige'] = sig_e                                          # Defining filtered signal to pass
         self.filt_data['sign'] = sig_n                                          # Defining filtered signal to pass
-        sig_e = onset(sig_e, stw, ltw)                                          # Determine the onset function from the filtered signal
-        sig_n = onset(sig_n, stw, ltw)                                          # Determine the onset function from the filtered signal
+        sig_e_raw,sig_e = onset(sig_e, stw, ltw)                                          # Determine the onset function from the filtered signal
+        sig_n_raw,sig_n = onset(sig_n, stw, ltw)                                          # Determine the onset function from the filtered signal
         self.onset_data['sige'] = sig_e                                         # Define the onset function from the data
         self.onset_data['sign'] = sig_n                                         # Define the onset function from the data                
-        snr = np.sqrt(sig_e * sig_e + sig_n * sig_n)                            # Define the combined onset function from E & N
+        snr = np.sqrt(sig_e * sig_e + sig_n * sig_n)
+        snr_raw = np.sqrt(sig_e_raw * sig_e_raw + sig_n_raw * sig_n_raw)                            # Define the combined onset function from E & N
         self.onset_data['sigs'] = snr
-        return snr
+        return snr_raw,snr
 
 
     def _compute(self, cstart,cend, samples,station_avaliability):
@@ -1057,13 +1078,17 @@ class SeisScan:
         #sign = sign - np.mean(sign,axis=1)
         #sigz = sigz - np.mean(sigz,axis=1)
 
-        snr_p1 = self._compute_onset_p1(sigz, srate)
-        snr_s1 = self._compute_onset_s1(sige, sign, srate)
+        snr_p1_raw,snr_p1 = self._compute_onset_p1(sigz, srate)
+        snr_s1_raw,snr_s1 = self._compute_onset_s1(sige, sign, srate)
         self.DATA.SNR_P = snr_p1
         self.DATA.SNR_S = snr_s1
+        self.DATA.SNR_P_raw = snr_p1
+        self.DATA.SNR_S_raw = snr_s1
+
+        #self._Gaussian_Coalescence()
 
 
-        snr = np.concatenate((snr_p1, snr_s1))
+        snr = np.concatenate((self.DATA.SNR_P, self.DATA.SNR_S))
         snr[np.isnan(snr)] = 0
         
         
@@ -1120,7 +1145,7 @@ class SeisScan:
         self.StartDateTime = datetime.strptime(starttime,'%Y-%m-%dT%H:%M:%S.%f')
         self.EndDateTime   = datetime.strptime(endtime,'%Y-%m-%dT%H:%M:%S.%f')
 
-	    # Deleting the scan if it exists alreadys
+        # Deleting the scan if it exists alreadys
         self.output.del_scan()
 
         
@@ -1320,7 +1345,186 @@ class SeisScan:
         self._continious_compute(starttime,endtime)
 
 
-    def _GaussianTrigger(self,SNR,PHASE,cstart,eventT):
+    def _Gaussian_Coalescence(self):
+        '''
+            Function to fit a gaussian for the coalescence function.
+        '''
+
+
+        SNR_P = self.DATA.SNR_P
+        SNR_S = self.DATA.SNR_S
+        X     = np.arange(SNR_P.shape[1])
+
+        GAU_THRESHOLD = 1.4
+
+        #---- Selecting only the data above a predefined threshold ----
+        # Setting values below threshold to nan
+        SNR_P[np.where(SNR_P < GAU_THRESHOLD)] = np.nan
+        SNR_S[np.where(SNR_S < GAU_THRESHOLD)] = np.nan
+
+
+
+
+        # Defining two blank arrays that gaussian periods should be defined for
+        SNR_P_GauNum = np.zeros(SNR_P.shape)*np.nan
+        SNR_S_GauNum = np.zeros(SNR_S.shape)*np.nan
+
+
+        # --- Determing the indexs to fit gaussians about ---
+
+        for s in range(len(SNR_P)):
+            c=0
+            e=1
+
+            ValInd = np.where(~np.isnan(SNR_P[s,:]))[0]
+            while c < len(ValInd):
+
+                # Determining the index when above the level and maximum value
+                d=c
+                while ValInd[d]+1 == ValInd[d+1]:
+                    d+=1
+                    if d+1 >= len(ValInd)-1:
+                        d=len(ValInd)-1
+                        break
+
+
+                indmin = c
+                indmax = d  
+
+                SNR_P_GauNum[s,ValInd[c]:ValInd[d]] = e  
+
+
+                c=d+1
+                e+=1
+
+        self.DATA.SNR_P_GauNum = SNR_P_GauNum
+
+        for s in range(len(SNR_S)):
+            c=0
+            e=1
+            ValInd = np.where(~np.isnan(SNR_S[s,:]))[0]
+            while c < len(ValInd):
+
+                # Determining the index when above the level and maximum value
+                d=c
+                while ValInd[d]+1 == ValInd[d+1]:
+                    d+=1
+                    if d+1 >= len(ValInd)-1:
+                        d=len(ValInd)-1
+                        break
+
+
+                indmin = c
+                indmax = d  
+
+                SNR_S_GauNum[s,ValInd[c]:ValInd[d]] = e  
+
+
+                c=d+1
+                e+=1
+
+
+
+        self.DATA.SNR_S_GauNum = SNR_S_GauNum
+
+        # --- Determing the indexs to fit gaussians about ---
+        
+        SNR_PGAU = np.zeros(SNR_P.shape)
+        for s in range(SNR_P.shape[0]): 
+            if ~np.isnan(np.nanmax(SNR_P_GauNum[s,:])):
+                c=0
+                for ee in range(1,int(round(np.nanmax(SNR_P_GauNum[s,:])))):
+
+
+                    XSig = X[np.where((SNR_P_GauNum[s,:] == ee))[0]] 
+                    YSig = SNR_P[s,np.where((SNR_P_GauNum[s,:] == ee))[0]]
+
+                    #print(' LEN = {} and CUT_LEN = {}'.format(len(YSig),round(float(self.bp_filter_p1[0])*self.sample_rate)/10))
+
+                    if len(YSig) > 8:
+
+                        #self.DATA.SNR_P =  YSig
+
+                        try:
+                            lowfreq=float(self.bp_filter_p1[0])
+                            p0 = [np.max(YSig), np.argmax(YSig) + np.min(XSig), 1./(lowfreq/4.)]
+
+                            # Fitting the gaussian to the function
+
+                            #print(XSig)
+                            #print(YSig)
+                            #print(p0)
+                            popt, pcov = curve_fit(gaussian_func, XSig, YSig, p0) # Fit gaussian to data
+                            tmp_PGau = gaussian_func(XSig.astype(float),float(popt[0]),float(popt[1]),float(popt[2]))
+                            #print(tmp_PGau)
+
+                            if c == 0:
+                                SNR_P_GAU = np.zeros(X.shape)
+                                SNR_P_GAU[np.where((SNR_P_GauNum[s,:] == ee))[0]] = tmp_PGau
+                                c+=1
+                            else:
+                                SNR_P_GAU[np.where((SNR_P_GauNum[s,:] == ee))[0]] = tmp_PGau
+                        except:
+                            print('Error with {}'.format(ee))
+
+                    else:
+                        continue
+
+                SNR_PGAU[s,:] =  SNR_P_GAU
+
+        self.DATA.SNR_P = SNR_PGAU
+
+
+
+        # --- Determing the indexs to fit gaussians about ---
+        
+        SNR_SGAU = np.zeros(SNR_S.shape)
+        for s in range(SNR_S.shape[0]): 
+            if ~np.isnan(np.nanmax(SNR_S_GauNum[s,:])):
+                c=0
+                for ee in range(1,int(round(np.nanmax(SNR_S_GauNum[s,:])))):
+
+
+                    XSig = X[np.where((SNR_S_GauNum[s,:] == ee))[0]] 
+                    YSig = SNR_S[s,np.where((SNR_S_GauNum[s,:] == ee))[0]]
+
+                    print(' LEN = {} and CUT_LEN = {}'.format(len(YSig),round(float(self.bp_filter_p1[0])*self.sample_rate)/10))
+
+                    if len(YSig) > 8:
+
+                        #self.DATA.SNR_P =  YSig
+
+                        try:
+                            lowfreq=float(self.bp_filter_p1[0])
+                            p0 = [np.max(YSig), np.argmax(YSig) + np.min(XSig), 1./(lowfreq/4.)]
+
+                            # Fitting the gaussian to the function
+
+                            print(XSig)
+                            print(YSig)
+                            print(p0)
+                            popt, pcov = curve_fit(gaussian_func, XSig, YSig, p0) # Fit gaussian to data
+                            tmp_SGau = gaussian_func(XSig.astype(float),float(popt[0]),float(popt[1]),float(popt[2]))
+                            print(tmp_SGau)
+
+                            if c == 0:
+                                SNR_S_GAU = np.zeros(X.shape)
+                                SNR_S_GAU[np.where((SNR_S_GauNum[s,:] == ee))[0]] = tmp_SGau
+                                c+=1
+                            else:
+                                SNR_S_GAU[np.where((SNR_S_GauNum[s,:] == ee))[0]] = tmp_SGau
+                        except:
+                            print('Error with {}'.format(ee))
+
+                    else:
+                        continue
+
+                SNR_SGAU[s,:] =  SNR_S_GAU
+
+        self.DATA.SNR_S = SNR_PGAU
+
+
+    def _GaussianTrigger(self,SNR,PHASE,cstart,eventTP,eventTS):
         '''
             Function to fit gaussian to onset function, based on knowledge of approximate trigger index, 
             lowest freq within signal and signal sampling rate. Will fit gaussian and return standard 
@@ -1331,12 +1535,39 @@ class SeisScan:
         #print('Fitting Gaussian for {} -  {} -  {}'.format(PHASE,cstart,eventT))
 
         sampling_rate = self.sample_rate
-        trig_idx = int(((eventT-cstart).seconds + (eventT-cstart).microseconds/10.**6) *sampling_rate)
+
+        # Determining the triggering X location based on the SNR value
+        trig_idx_P = int(((eventTP-cstart).seconds + (eventTP-cstart).microseconds/10.**6) *sampling_rate)
+        trig_idx_S = int(((eventTS-cstart).seconds + (eventTS-cstart).microseconds/10.**6) *sampling_rate)
+
+
+
+        P_idxmin = int(trig_idx_P - (trig_idx_S-trig_idx_P)/2)
+        P_idxmax = int(trig_idx_P + (trig_idx_S-trig_idx_P)/2)
+        S_idxmin = int(trig_idx_S - (trig_idx_S-trig_idx_P)/2)
+        S_idxmax = int(trig_idx_S + (trig_idx_S-trig_idx_P)/2)
+        for ii in [P_idxmin,P_idxmax,S_idxmin,S_idxmax]:
+            if ii < 0:
+                ii = 0
+            if ii > len(SNR):
+                ii = len(SNR)
+
+
+        print(' Pmin = {} , Pmax = {}'.format(P_idxmin,P_idxmax))
+        print(' Smin = {} , Smax = {}'.format(S_idxmin,S_idxmax))
+    
+        Pidx = np.argmax(SNR[P_idxmin:P_idxmax]) + P_idxmin
+        Sidx = np.argmax(SNR[S_idxmin:S_idxmax]) + S_idxmin
+        print(Pidx,Sidx)
+
+
 
         if PHASE == 'P':
             lowfreq = self.bp_filter_p1[0]
+            trig_idx = Pidx
         if PHASE == 'S':
             lowfreq = self.bp_filter_s1[0]
+            trig_idx = Sidx
 
         data_half_range = int(1.25*sampling_rate/(lowfreq)) # half range number of indices to fit guassian over (for 1 wavelengths of lowest frequency component)
         x_data = np.arange(trig_idx-data_half_range, trig_idx+data_half_range,dtype=float)/sampling_rate # x data, in seconds
@@ -1379,14 +1610,16 @@ class SeisScan:
 
 
 
+
+
     def _ArrivalTrigger(self,EVENT_MaxCoa,EventName):
         '''
             FUNCTION - _ArrivalTrigger - Used to determine earthquake station arrival time
 
         '''
 
-        SNR_P = self.DATA.SNR_P
-        SNR_S = self.DATA.SNR_S
+        SNR_P = self.DATA.SNR_P_raw
+        SNR_S = self.DATA.SNR_S_raw
 
         ttp = self.lookup_table.value_at('TIME_P', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()]))).astype(int))[0]
         tts = self.lookup_table.value_at('TIME_S', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()]))).astype(int))[0]
@@ -1395,11 +1628,12 @@ class SeisScan:
         c=0
         d=0
         for s in range(len(SNR_P)):
+            stationEventPT = EVENT_MaxCoa['DT'] + timedelta(seconds=ttp[s])
+            stationEventST = EVENT_MaxCoa['DT'] + timedelta(seconds=tts[s])
             if np.nansum(SNR_P[s]) !=  0:
-                stationEventPT = EVENT_MaxCoa['DT'] + timedelta(seconds=ttp[s])
 
                 if self.PickingType == 'Gaussian':
-                    GauInfoP,Err,Mn = self._GaussianTrigger(SNR_P[s],'P',self.DATA.startTime,stationEventPT.to_pydatetime())
+                    GauInfoP,Err,Mn = self._GaussianTrigger(SNR_P[s],'P',self.DATA.startTime,stationEventPT.to_pydatetime(),stationEventST.to_pydatetime())
 
                 if c==0:
                     GAUP = GauInfoP
@@ -1412,10 +1646,10 @@ class SeisScan:
 
             if np.nansum(SNR_S[s]) != 0:
                 
-                stationEventST = EVENT_MaxCoa['DT'] + timedelta(seconds=tts[s])
+                
 
                 if self.PickingType == 'Gaussian':
-                    GauInfoS,Err,Mn = self._GaussianTrigger(SNR_S[s],'S',self.DATA.startTime,stationEventST.to_pydatetime())
+                    GauInfoS,Err,Mn = self._GaussianTrigger(SNR_S[s],'S',self.DATA.startTime,stationEventPT.to_pydatetime(),stationEventST.to_pydatetime())
 
 
                 if d==0:
@@ -1432,7 +1666,6 @@ class SeisScan:
         self.output.write_stationsfile(STATIONS,EventName)
 
         return STATIONS,GAUP,GAUS
-
 
     def _ErrorEllipse(self,COA3D):
         """
