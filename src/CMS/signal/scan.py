@@ -60,10 +60,15 @@ def onset(sig, stw, ltw):
     snr = np.copy(sig)
     snr_raw = np.copy(sig)
     for ch in range(0, nchan):
-        snr[ch, :] = classic_sta_lta(sig[ch, :]+1.0, stw, ltw)
-        snr_raw[ch, :] = snr[ch, :]
-        np.clip(1+snr[ch,:],0.8,np.inf,snr[ch, :])
-        np.log(snr[ch, :], snr[ch, :])
+        if np.sum(sig[ch,:]) == 0.0:
+            snr[ch, :] = 0.0
+            snr_raw[ch, :] = snr[ch,:]
+        else:
+            snr[ch, :] = classic_sta_lta(sig[ch, :]+1.0, stw, ltw)
+            snr_raw[ch, :] = snr[ch,:]
+            np.clip(1+snr[ch,:],0.8,np.inf,snr[ch, :])
+            np.log(snr[ch, :], snr[ch, :])
+
     return snr_raw,snr
 
 
@@ -650,6 +655,8 @@ class SeisPlot:
                 ZTrace_Seis.set_xlim([MINT,MAXT])
                 P_Onset.set_xlim([MINT,MAXT])
                 S_Onset.set_xlim([MINT,MAXT])
+
+                fig.suptitle('Trace for Station {}'.format(self.LUT.station_data['Name'][ii]))
                 
                 if SaveFilename == None:
                    plt.show()
@@ -1082,8 +1089,8 @@ class SeisScan:
         snr_s1_raw,snr_s1 = self._compute_onset_s1(sige, sign, srate)
         self.DATA.SNR_P = snr_p1
         self.DATA.SNR_S = snr_s1
-        self.DATA.SNR_P_raw = snr_p1
-        self.DATA.SNR_S_raw = snr_s1
+        self.DATA.SNR_P_raw = snr_p1_raw
+        self.DATA.SNR_S_raw = snr_s1_raw
 
         #self._Gaussian_Coalescence()
 
@@ -1524,7 +1531,7 @@ class SeisScan:
         self.DATA.SNR_S = SNR_PGAU
 
 
-    def _GaussianTrigger(self,SNR,PHASE,cstart,eventTP,eventTS):
+    def _GaussianTrigger(self,SNR,PHASE,cstart,eventTP,eventTS,Name):
         '''
             Function to fit gaussian to onset function, based on knowledge of approximate trigger index, 
             lowest freq within signal and signal sampling rate. Will fit gaussian and return standard 
@@ -1553,12 +1560,12 @@ class SeisScan:
                 ii = len(SNR)
 
 
-        print(' Pmin = {} , Pmax = {}'.format(P_idxmin,P_idxmax))
-        print(' Smin = {} , Smax = {}'.format(S_idxmin,S_idxmax))
+        #print(' Pmin = {} , Pmax = {}'.format(P_idxmin,P_idxmax))
+        #print(' Smin = {} , Smax = {}'.format(S_idxmin,S_idxmax))
     
         Pidx = np.argmax(SNR[P_idxmin:P_idxmax]) + P_idxmin
         Sidx = np.argmax(SNR[S_idxmin:S_idxmax]) + S_idxmin
-        print(Pidx,Sidx)
+        #print(Pidx,Sidx)
 
 
 
@@ -1583,6 +1590,16 @@ class SeisScan:
             else:
                 XDATA = np.hstack((XDATA,(cstart + timedelta(seconds=x_data[jj]))))
 
+
+
+
+
+
+
+
+
+
+
         
         try:
             popt, pcov = curve_fit(gaussian_func, x_data, y_data, p0) # Fit gaussian to data
@@ -1591,10 +1608,41 @@ class SeisScan:
             # Mean is popt[1]. x_data[0] + popt[1] (In seconds)
             mean = cstart + timedelta(seconds=float(popt[1]))
 
-            GAU_FITS = {}
-            GAU_FITS['popt'] = popt
-            GAU_FITS['xdata'] = x_data
-            GAU_FITS['xdata_dt'] = XDATA
+
+            # Determining if the pick is above 
+            n, bins = np.histogram(SNR,bins=np.arange(0,np.max(SNR),7/5000))
+            mids = 0.5*(bins[1:] + bins[:-1])
+            ncum = np.cumsum(n)/np.sum(n)
+            #print(ncum)
+
+            #print(np.where((mids-popt[0]) >= 0)[0])
+
+            if (len(np.where((mids-popt[0]) >= 0)[0]) == 0):
+                #print('Picked {} for {}'.format(PHASE,Name))
+                GAU_FITS = {}
+                GAU_FITS['popt'] = popt
+                GAU_FITS['xdata'] = x_data
+                GAU_FITS['xdata_dt'] = XDATA
+                GAU_FITS['PickValue'] = 1.0 
+
+            else:
+                if (np.min(ncum[np.where((mids-popt[0]) >= 0)[0]]) >= 0.98):
+                    #print('Picked 2 {} for {} - {}'.format(PHASE,Name,np.min(ncum[np.where((mids-popt[0]) >= 0)[0]])))
+                    GAU_FITS = {}
+                    GAU_FITS['popt'] = popt
+                    GAU_FITS['xdata'] = x_data
+                    GAU_FITS['xdata_dt'] = XDATA
+                    GAU_FITS['PickValue'] = np.min(ncum[np.where((mids-popt[0]) >= 0)[0]])
+                else:
+                    #print('Didnt Pick {} for {} - {}'.format(PHASE,Name,np.min(ncum[np.where((mids-popt[0]) >= 0)[0]])))
+                    GAU_FITS = {}
+                    GAU_FITS['popt'] = np.zeros((3))
+                    GAU_FITS['xdata'] = np.zeros(x_data.shape)
+                    GAU_FITS['xdata_dt'] = np.zeros(XDATA.shape)
+                    GAU_FITS['PickValue'] = np.min(ncum[np.where((mids-popt[0]) >= 0)[0]])
+                    sigma = -1
+                    mean  = -1
+
 
             #print(mean)
         except:
@@ -1618,8 +1666,8 @@ class SeisScan:
 
         '''
 
-        SNR_P = self.DATA.SNR_P_raw
-        SNR_S = self.DATA.SNR_S_raw
+        SNR_P = self.DATA.SNR_P
+        SNR_S = self.DATA.SNR_S
 
         ttp = self.lookup_table.value_at('TIME_P', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()]))).astype(int))[0]
         tts = self.lookup_table.value_at('TIME_S', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()]))).astype(int))[0]
@@ -1631,9 +1679,10 @@ class SeisScan:
             stationEventPT = EVENT_MaxCoa['DT'] + timedelta(seconds=ttp[s])
             stationEventST = EVENT_MaxCoa['DT'] + timedelta(seconds=tts[s])
             if np.nansum(SNR_P[s]) !=  0:
+                #print(self.lookup_table.station_data['Name'][s],'P',np.nansum(SNR_P[s]))
 
                 if self.PickingType == 'Gaussian':
-                    GauInfoP,Err,Mn = self._GaussianTrigger(SNR_P[s],'P',self.DATA.startTime,stationEventPT.to_pydatetime(),stationEventST.to_pydatetime())
+                    GauInfoP,Err,Mn = self._GaussianTrigger(SNR_P[s],'P',self.DATA.startTime,stationEventPT.to_pydatetime(),stationEventST.to_pydatetime(),self.lookup_table.station_data['Name'][s])
 
                 if c==0:
                     GAUP = GauInfoP
@@ -1649,7 +1698,7 @@ class SeisScan:
                 
 
                 if self.PickingType == 'Gaussian':
-                    GauInfoS,Err,Mn = self._GaussianTrigger(SNR_S[s],'S',self.DATA.startTime,stationEventPT.to_pydatetime(),stationEventST.to_pydatetime())
+                    GauInfoS,Err,Mn = self._GaussianTrigger(SNR_S[s],'S',self.DATA.startTime,stationEventPT.to_pydatetime(),stationEventST.to_pydatetime(),self.lookup_table.station_data['Name'][s])
 
 
                 if d==0:
