@@ -34,43 +34,31 @@ until finished
 
 End with an example of getting some data out of the system or using it for a little demo
 
-## Running the tests
+### Running the tests
 
 Explain how to run the automated tests for this system
 
 
-## Deployment
-
-Add additional notes about how to deploy this on a live system
 
 ## Built With
 
-* [Dropwizard](http://www.dropwizard.io/1.0.2/docs/) - The web framework used
-* [Maven](https://maven.apache.org/) - Dependency Management
-* [ROME](https://rometools.github.io/rome/) - Used to generate RSS Feeds
+* [ObsPy](https://github.com/obspy/obspy/wiki) - Python framework for processing seismological data
+* [scikit-fmm](https://pythonhosted.org/scikit-fmm/) - Python extension module which implements the fast marching method
+* [NumPy](http://www.numpy.org/) - NumPy is the fundamental package for scientific computing with Python
+* [SciPy](https://www.scipy.org/) - Python-based ecosystem of open-source software for mathematics, science, and engineering
 
-## Contributing
+## Collaborating
 
-Please read [CONTRIBUTING.md](https://gist.github.com/PurpleBooth/b24679402957c63ec426) for details on our code of conduct, and the process for submitting pull requests to us.
-
-## Versioning
-
-We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/your/project/tags). 
+Please 
 
 ## Authors
 
-* **Jonathan Smith** - *Project Leader* - *Induced Seismicity, Geomechanics and Mitigating Geohazard* [Link]()
-* **Tom Hudson** - *Project Leader* - *Glacioseismology and Icedyanmics* [Link]()
-* **Tom Winder** - *Project Leader* - *Volcanoseismology and Earthquake Triggering* [Link]()
+* **Jonathan Smith** - *Project Leaders* - *Induced Seismicity, Geomechanics and Mitigating Geohazard* [Link](https://www.esc.cam.ac.uk/directory/jonathan-smith)
+* **Tom Hudson** - *Project Leaders* - *Glacioseismology and Icedyanmics* [Link](https://www.esc.cam.ac.uk/directory/tom-s-hudson)
+* **Tom Winder** - *Project Leaders* - *Volcanoseismology and Earthquake Triggering* [Link](https://www.esc.cam.ac.uk/directory/tom-winder)
 
 Future contributors will be added to this list.
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details. For industry usage please contact [cmscanning.Collaboration](cmscanning.Collaboration@gmail.com).
-
-## Acknowledgments
-
-* Hat tip to anyone whose code was used
-* Inspiration
-* etc
