@@ -36,7 +36,7 @@ CLASSIFIERS = [
     "Topic :: Scientific/Engineering",
 ]
 # hjson is not in Conda Repository
-INSTALL_REQUIRES = ['numpy', 'pandas', 'scipy','skfmm', 'pyproj', 'matplotlib', 'vispy', 'pyzmq', 'msgpack-python']
+INSTALL_REQUIRES = ['numpy', 'pandas', 'scipy','scikit-fmm', 'pyproj', 'matplotlib', 'vispy', 'pyzmq', 'msgpack-python']
 
 
 # ADD A COMPILE STAGE THAT GENERATES THE REQUIRED C-Compile of code. Get working for several operating systems.

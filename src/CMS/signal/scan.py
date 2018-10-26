@@ -656,7 +656,7 @@ class SeisPlot:
                 P_Onset.set_xlim([MINT,MAXT])
                 S_Onset.set_xlim([MINT,MAXT])
 
-                fig.suptitle('Trace for Station {}'.format(self.LUT.station_data['Name'][ii]))
+                fig.suptitle('Trace for Station {} - PPick = {}, SPick = {}'.format(self.LUT.station_data['Name'][ii],self.StationPick['GAU_P'][ii]['PickValue'],self.StationPick['GAU_S'][ii]['PickValue']))
                 
                 if SaveFilename == None:
                    plt.show()
@@ -975,6 +975,8 @@ class SeisScan:
         self.daten = None
         self.dsnr  = None
         self.dloc  = None
+
+        self.PickThreshold = 1.0
         
 
         self.bp_filter_p1 = param.bp_filter_p1
@@ -1626,7 +1628,7 @@ class SeisScan:
                 GAU_FITS['PickValue'] = 1.0 
 
             else:
-                if (np.min(ncum[np.where((mids-popt[0]) >= 0)[0]]) >= 0.98):
+                if (np.min(ncum[np.where((mids-popt[0]) >= 0)[0]]) >= self.PickThreshold):
                     #print('Picked 2 {} for {} - {}'.format(PHASE,Name,np.min(ncum[np.where((mids-popt[0]) >= 0)[0]])))
                     GAU_FITS = {}
                     GAU_FITS['popt'] = popt
