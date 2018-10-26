@@ -40,7 +40,7 @@ INSTALL_REQUIRES = ['numpy', 'pandas', 'scipy','scikit-fmm', 'pyproj', 'matplotl
 
 
 # ADD A COMPILE STAGE THAT GENERATES THE REQUIRED C-Compile of code. Get working for several operating systems.
-#os.system('gcc -shared -fPIC -std=gnu99 ./src/CMS/lib/src/onset.c ./src/CMS/lib/src/cmscan.c ./src/CMS/lib/src/levinson.c -fopenmp -O0 -o ./src/CMS/lib/cmslib.so')
+os.system('gcc -shared -fPIC -std=gnu99 ./src/CMS/lib/src/onset.c ./src/CMS/lib/src/cmscan.c ./src/CMS/lib/src/levinson.c -fopenmp -O0 -o ./src/CMS/lib/cmslib.so')
 
 
 ###################################################################
