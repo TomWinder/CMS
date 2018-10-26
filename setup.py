@@ -27,7 +27,7 @@ INCLUDE_DIRS=numpy.distutils.misc_util.get_numpy_include_dirs()
 META_PATH = os.path.join("src", "CMS", "__init__.py")
 KEYWORDS = ["Coalescence", "Seismic", "MicroSeismic"]
 CLASSIFIERS = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: Beta",
     "Intended Audience :: Geophysicist",
     "Natural Language :: English",
     "License :: OSI Approved :: MIT License",
@@ -36,11 +36,11 @@ CLASSIFIERS = [
     "Topic :: Scientific/Engineering",
 ]
 # hjson is not in Conda Repository
-INSTALL_REQUIRES = ['numpy', 'pandas', 'pyproj', 'matplotlib', 'vispy', 'pyzmq', 'msgpack-python']
+INSTALL_REQUIRES = ['numpy', 'pandas', 'scipy','skfmm', 'pyproj', 'matplotlib', 'vispy', 'pyzmq', 'msgpack-python']
 
 
 # ADD A COMPILE STAGE THAT GENERATES THE REQUIRED C-Compile of code. Get working for several operating systems.
-os.system('gcc -shared -fPIC -std=gnu99 ./src/CMS/lib/src/onset.c ./src/CMS/lib/src/cmscan.c ./src/CMS/lib/src/levinson.c -fopenmp -O0 -o ./src/CMS/lib/cmslib.so')
+#os.system('gcc -shared -fPIC -std=gnu99 ./src/CMS/lib/src/onset.c ./src/CMS/lib/src/cmscan.c ./src/CMS/lib/src/levinson.c -fopenmp -O0 -o ./src/CMS/lib/cmslib.so')
 
 
 ###################################################################
