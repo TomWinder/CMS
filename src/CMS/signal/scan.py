@@ -160,9 +160,15 @@ class SeisOutFile:
             fp.write(message + '\n')
 
 
-    def write_event(self, EVENT):
-        fname = path.join(self.path,self.name + '_Event.txt')
-        EVENT.to_csv(fname,index=False)
+
+
+    def cut_mseed(self,DATA,EventName):
+        fname = path.join(self.path,self.name + '_{}.mseed'.format(EventName))
+        
+        st = DATA.st
+        st.write(fname, format='MSEED')
+
+
 
     def del_scan(self):
         fname = path.join(self.path,self.name + '.scn')
@@ -310,6 +316,7 @@ class SeisPlot:
             self.Plot_Stations    = True
             self.FilteredSignal   = True
             self.XYFiles          = None
+            self.RangeOrder       = False
         else:
             try:
                 self.TraceScaling     = PlotOptions.TraceScaling
@@ -377,15 +384,18 @@ class SeisPlot:
         STIn = np.where(self.times == self.EVENT['DT'].iloc[0])[0][0]
         ENIn = np.where(self.times == self.EVENT['DT'].iloc[-1])[0][0]
 
+        # ------------ Defining the stations in alphabetical order --------
+        StaInd = np.argsort(self.DATA.StationInformation['Name'])[::-1]
+
         for ii in range(self.DATA.signal.shape[1]): 
             if self.FilteredSignal == False:
-                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[0,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[0,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'r',linewidth=0.5)
-                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[1,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[1,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'b',linewidth=0.5)
-                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[2,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[2,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'g',linewidth=0.5)
+                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[0,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[0,ii,STIn:ENIn])))*self.TraceScaling+(StaInd[ii]+1),'r',linewidth=0.5)
+                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[1,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[1,ii,STIn:ENIn])))*self.TraceScaling+(StaInd[ii]+1),'b',linewidth=0.5)
+                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.signal[2,ii,STIn:ENIn]/np.max(abs(self.DATA.signal[2,ii,STIn:ENIn])))*self.TraceScaling+(StaInd[ii]+1),'g',linewidth=0.5)
             else:
-                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[0,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[0,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'r',linewidth=0.5)
-                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[1,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[1,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'b',linewidth=0.5)
-                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[2,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[2,ii,STIn:ENIn])))*self.TraceScaling+(ii+1),'g',linewidth=0.5)
+                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[0,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[0,ii,STIn:ENIn])))*self.TraceScaling+(StaInd[ii]+1),'r',linewidth=0.5)
+                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[1,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[1,ii,STIn:ENIn])))*self.TraceScaling+(StaInd[ii]+1),'b',linewidth=0.5)
+                    Coa_Trace.plot(np.arange(STIn,ENIn),(self.DATA.FilteredSignal[2,ii,STIn:ENIn]/np.max(abs(self.DATA.FilteredSignal[2,ii,STIn:ENIn])))*self.TraceScaling+(StaInd[ii]+1),'g',linewidth=0.5)
 
         # ---------------- Plotting the Station Travel Times -----------
         for i in range(self.LUT.get_value_at('TIME_P',np.array([indexVal]))[0].shape[0]):
@@ -400,15 +410,15 @@ class SeisPlot:
                 TS = np.append(TS,ts)
 
 
-        self.CoaArriavalTP = Coa_Trace.scatter(TP,(np.arange(self.DATA.signal.shape[1])+1),15,'r',marker='v')
-        self.CoaArriavalTS = Coa_Trace.scatter(TS,(np.arange(self.DATA.signal.shape[1])+1),15,'b',marker='v')
+        self.CoaArriavalTP = Coa_Trace.scatter(TP,StaInd[ii]+1,15,'r',marker='v')
+        self.CoaArriavalTS = Coa_Trace.scatter(TS,StaInd[ii]+1,15,'b',marker='v')
 
         Coa_Trace.set_ylim([0,ii+2])
         Coa_Trace.set_xlim([STIn,ENIn])
         Coa_Trace.get_xaxis().set_ticks([])
         Coa_Trace.yaxis.tick_right()
-        Coa_Trace.yaxis.set_ticks(np.arange(self.DATA.signal.shape[1])+1)
-        Coa_Trace.yaxis.set_ticklabels(self.DATA.StationInformation['Name'])
+        Coa_Trace.yaxis.set_ticks(StaInd[ii]+1)
+        Coa_Trace.yaxis.set_ticklabels(np.sort(self.DATA.StationInformation['Name'])[::-1])
         self.CoaTraceVLINE = Coa_Trace.axvline(TimeSlice,0,1000,linestyle='--',linewidth=2,color='r')
 
 
@@ -725,15 +735,26 @@ class SeisPlot:
         STIn = np.where(self.times == self.EVENT['DT'].iloc[0])[0][0]
         ENIn = np.where(self.times == self.EVENT['DT'].iloc[-1])[0][0]
 
+
+
+        # --------------- Ordering by distance to event --------------
+        if self.RangeOrder == True: 
+            print(self.LUT.get_value_at('TIME_P',np.array([indexVal[0][0],indexVal[1][0],indexVal[2][0]]))[0])
+            StaInd = np.argsort(self.LUT.get_value_at('TIME_P',np.array([indexVal[0][0],indexVal[1][0],indexVal[2][0]]))[0])[::-1]
+            print(StaInd)
+        else:
+            StaInd = np.argsort(self.DATA.StationInformation['Name'])[::-1]
+
+
         for ii in range(self.DATA.signal.shape[1]): 
            if self.FilteredSignal == False:
-                   Coa_Trace.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.signal[0,ii,:]/np.max(abs(self.DATA.signal[0,ii,:])))*self.TraceScaling+(ii+1),'r',linewidth=0.5)
-                   Coa_Trace.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.signal[1,ii,:]/np.max(abs(self.DATA.signal[1,ii,:])))*self.TraceScaling+(ii+1),'b',linewidth=0.5)
-                   Coa_Trace.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.signal[2,ii,:]/np.max(abs(self.DATA.signal[2,ii,:])))*self.TraceScaling+(ii+1),'g',linewidth=0.5)
+                   Coa_Trace.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.signal[0,ii,:]/np.max(abs(self.DATA.signal[0,ii,:])))*self.TraceScaling+(StaInd[ii]+1),'r',linewidth=0.5)
+                   Coa_Trace.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.signal[1,ii,:]/np.max(abs(self.DATA.signal[1,ii,:])))*self.TraceScaling+(StaInd[ii]+1),'b',linewidth=0.5)
+                   Coa_Trace.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.signal[2,ii,:]/np.max(abs(self.DATA.signal[2,ii,:])))*self.TraceScaling+(StaInd[ii]+1),'g',linewidth=0.5)
            else:
-                   Coa_Trace.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.FilteredSignal[0,ii,:]/np.max(abs(self.DATA.FilteredSignal[0,ii,:])))*self.TraceScaling+(ii+1),'r',linewidth=0.5)
-                   Coa_Trace.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.FilteredSignal[1,ii,:]/np.max(abs(self.DATA.FilteredSignal[1,ii,:])))*self.TraceScaling+(ii+1),'b',linewidth=0.5)
-                   Coa_Trace.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.FilteredSignal[2,ii,:]/np.max(abs(self.DATA.FilteredSignal[2,ii,:])))*self.TraceScaling+(ii+1),'g',linewidth=0.5)
+                   Coa_Trace.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.FilteredSignal[0,ii,:]/np.max(abs(self.DATA.FilteredSignal[0,ii,:])))*self.TraceScaling+(StaInd[ii]+1),'r',linewidth=0.5)
+                   Coa_Trace.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.FilteredSignal[1,ii,:]/np.max(abs(self.DATA.FilteredSignal[1,ii,:])))*self.TraceScaling+(StaInd[ii]+1),'b',linewidth=0.5)
+                   Coa_Trace.plot(np.arange(self.DATA.startTime,self.DATA.endTime+timedelta(seconds=1/self.DATA.sampling_rate),timedelta(seconds=1/self.DATA.sampling_rate)),(self.DATA.FilteredSignal[2,ii,:]/np.max(abs(self.DATA.FilteredSignal[2,ii,:])))*self.TraceScaling+(StaInd[ii]+1),'g',linewidth=0.5)
 
         # ---------------- Plotting the Station Travel Times -----------
         for i in range(self.LUT.get_value_at('TIME_P',np.array([indexVal[0][0],indexVal[1][0],indexVal[2][0]]))[0].shape[0]):
@@ -748,14 +769,14 @@ class SeisPlot:
                TS = np.append(TS,ts)
 
 
-        self.CoaArriavalTP = Coa_Trace.scatter(TP,(np.arange(self.DATA.signal.shape[1])+1),15,'pink',marker='v')
-        self.CoaArriavalTS = Coa_Trace.scatter(TS,(np.arange(self.DATA.signal.shape[1])+1),15,'purple',marker='v')
+        self.CoaArriavalTP = Coa_Trace.scatter(TP,(StaInd+1),40,'pink',marker='v')
+        self.CoaArriavalTS = Coa_Trace.scatter(TS,(StaInd+1),40,'purple',marker='v')
 
 #        Coa_Trace.set_ylim([0,ii+2])
         Coa_Trace.set_xlim([self.DATA.startTime+timedelta(seconds=1.6),np.max(TS)])
         Coa_Trace.get_xaxis().set_ticks([])
         Coa_Trace.yaxis.tick_right()
-        Coa_Trace.yaxis.set_ticks(np.arange(self.DATA.signal.shape[1])+1)
+        Coa_Trace.yaxis.set_ticks(StaInd+1)
         Coa_Trace.yaxis.set_ticklabels(self.DATA.StationInformation['Name'])
         self.CoaTraceVLINE = Coa_Trace.axvline(self.EVENT['DT'].iloc[np.argmax(self.EVENT['COA'])],0,1000,linestyle='--',linewidth=2,color='r')
 
@@ -1018,6 +1039,7 @@ class SeisScan:
         self.CoalescenceVideo   = False
         self.CoalescencePicture = False
         self.CoalescenceTrace   = False
+        self.CutMSEED           = False
         self.PickingType        = 'Gaussian'
         self.LocationError      = 0.95
 
@@ -1298,30 +1320,63 @@ class SeisScan:
         return EVENTS
 
 
-    def plot_scn(self,stations=None,savefile=None):
+    def plot_scn(self,starttime,endtime,stations=None,savefile=None):
         '''
 
 
         '''
 
         # Defining the filename of the trace
-        fname = path.join(self.path,self.name + '.scn')
+        fname = path.join(self.output.path,self.output.name + '.scn')
+
+
 
         if path.exists(fname):
+
             # Loading the .scn file
             DATA = pd.read_csv(fname,names=['DT','COA','X','Y','Z'])
             DATA['DT'] = pd.to_datetime(DATA['DT'])
 
             if stations == None:
                 # Plotting the .scn file
-                fig = plt.figure()
-                plt.plot(DATA['DT'],DATA['COA'])
-            else:
-                # Plotting the .scn file
-                fig = plt.figure()
-                plt.plot(DATA['DT'],DATA['COA'])
 
-                # --- REDEFINE THE PLOTTING FOR STATION TRACES AS WELL ! --
+                fig = plt.figure(figsize=(30,15))
+                fig.patch.set_facecolor('white')
+                plt.plot(DATA['DT'],DATA['COA'],color='blue')
+                plt.xlabel('Datetime')
+                plt.ylabel('Maximum Coalescence')
+                plt.axhline(self.DetectionThreshold,color='green')
+
+                EVENTS = self._Trigger_scn(DATA,DATA['DT'].iloc[0].strftime('%Y-%m-%dT%H:%M:%S.%f'),DATA['DT'].iloc[-1].strftime('%Y-%m-%dT%H:%M:%S.%f'))
+
+                for ee in range(len(EVENTS['MinTime'])):
+                    plt.axvline(x=pd.to_datetime(EVENTS['MinTime'].iloc[ee]),linestyle='--',color='red')
+                    plt.axvline(x=pd.to_datetime(EVENTS['MaxTime'].iloc[ee]),linestyle='--',color='red')
+                    plt.axvline(x=pd.to_datetime(EVENTS['CoaTime'].iloc[ee]),color='red')
+
+                plt.xlim([pd.to_datetime(starttime),pd.to_datetime(endtime)])
+
+
+            else:
+                # Plotting the .scn file with the addition of station avaliability
+                fig = plt.figure(figsize=(30,15))
+                fig.patch.set_facecolor('white')
+                plt.plot(DATA['DT'],DATA['COA'],color='blue')
+                plt.xlabel('Datetime')
+                plt.ylabel('Maximum Coalescence')
+                plt.axhline(self.DetectionThreshold,color='green')
+
+                EVENTS = self._Trigger_scn(DATA,DATA['DT'].iloc[0].strftime('%Y-%m-%dT%H:%M:%S.%f'),DATA['DT'].iloc[-1].strftime('%Y-%m-%dT%H:%M:%S.%f'))
+
+                for ee in range(len(EVENTS['MinTime'])):
+                    plt.axvline(x=pd.to_datetime(EVENTS['MinTime'].iloc[ee]),linestyle='--',color='red')
+                    plt.axvline(x=pd.to_datetime(EVENTS['MaxTime'].iloc[ee]),linestyle='--',color='red')
+                    plt.axvline(x=pd.to_datetime(EVENTS['CoaTime'].iloc[ee]),color='red')
+
+                plt.xlim([pd.to_datetime(starttime),pd.to_datetime(endtime)])
+
+
+
 
 
             # Saving figure if defined
@@ -1610,6 +1665,8 @@ class SeisScan:
             # Mean is popt[1]. x_data[0] + popt[1] (In seconds)
             mean = cstart + timedelta(seconds=float(popt[1]))
 
+            maxSNR = popt[0]
+
 
             # Determining if the pick is above 
             n, bins = np.histogram(SNR,bins=np.arange(0,np.max(SNR),7/5000))
@@ -1644,6 +1701,7 @@ class SeisScan:
                     GAU_FITS['PickValue'] = np.min(ncum[np.where((mids-popt[0]) >= 0)[0]])
                     sigma = -1
                     mean  = -1
+                    maxSNR = -1 
 
 
             #print(mean)
@@ -1655,8 +1713,9 @@ class SeisScan:
 
             sigma = -1
             mean  = -1
+            maxSNR = -1
 
-        return GAU_FITS,sigma,mean
+        return GAU_FITS,maxSNR,sigma,mean
 
 
 
@@ -1684,7 +1743,7 @@ class SeisScan:
                 #print(self.lookup_table.station_data['Name'][s],'P',np.nansum(SNR_P[s]))
 
                 if self.PickingType == 'Gaussian':
-                    GauInfoP,Err,Mn = self._GaussianTrigger(SNR_P[s],'P',self.DATA.startTime,stationEventPT.to_pydatetime(),stationEventST.to_pydatetime(),self.lookup_table.station_data['Name'][s])
+                    GauInfoP,maxSNR_P,Err,Mn = self._GaussianTrigger(SNR_P[s],'P',self.DATA.startTime,stationEventPT.to_pydatetime(),stationEventST.to_pydatetime(),self.lookup_table.station_data['Name'][s])
 
                 if c==0:
                     GAUP = GauInfoP
@@ -1692,7 +1751,7 @@ class SeisScan:
                 else:
                     GAUP = np.hstack((GAUP,GauInfoP))
                 
-                tmpSTATION = pd.DataFrame([[self.lookup_table.station_data['Name'][s],'P',stationEventPT,Mn,Err,SNR_P[s]]],columns=['Name','Phase','ModelledTime','PickTime','PickError','PickSNR'])
+                tmpSTATION = pd.DataFrame([[self.lookup_table.station_data['Name'][s],'P',stationEventPT,Mn,Err,maxSNR_P]],columns=['Name','Phase','ModelledTime','PickTime','PickError','PickSNR'])
                 STATIONS = STATIONS.append(tmpSTATION)
 
             if np.nansum(SNR_S[s]) != 0:
@@ -1700,7 +1759,7 @@ class SeisScan:
                 
 
                 if self.PickingType == 'Gaussian':
-                    GauInfoS,Err,Mn = self._GaussianTrigger(SNR_S[s],'S',self.DATA.startTime,stationEventPT.to_pydatetime(),stationEventST.to_pydatetime(),self.lookup_table.station_data['Name'][s])
+                    GauInfoS,maxSNR_S,Err,Mn = self._GaussianTrigger(SNR_S[s],'S',self.DATA.startTime,stationEventPT.to_pydatetime(),stationEventST.to_pydatetime(),self.lookup_table.station_data['Name'][s])
 
 
                 if d==0:
@@ -1709,11 +1768,12 @@ class SeisScan:
                 else:
                     GAUS = np.hstack((GAUS,GauInfoS))
 
-                tmpSTATION = pd.DataFrame([[self.lookup_table.station_data['Name'][s],'S',stationEventST,Mn,Err,SNR_S[s]]],columns=['Name','Phase','ModelledTime','PickTime','PickError','PickSNR'])
+                tmpSTATION = pd.DataFrame([[self.lookup_table.station_data['Name'][s],'S',stationEventST,Mn,Err,maxSNR_S]],columns=['Name','Phase','ModelledTime','PickTime','PickError','PickSNR'])
                 STATIONS = STATIONS.append(tmpSTATION)
 
         #print(STATIONS)
         # Saving the output from the triggered events
+        STATIONS = STATIONS[['Name','Phase','ModelledTime','PickTime','PickError']]
         self.output.write_stationsfile(STATIONS,EventName)
 
         return STATIONS,GAUP,GAUS
@@ -1850,6 +1910,9 @@ class SeisScan:
 
             EV = pd.DataFrame([np.append(self.EVENT.iloc[np.argmax(self.EVENT['COA'])].as_matrix(),[LOC[0],LOC[1],LOC[2],LOC_ERR[0],LOC_ERR[1],LOC_ERR[2]])],columns=['DT','COA','X','Y','Z','X_ErrE','Y_ErrE','Z_ErrE','ErrX','ErrY','ErrZ'])
             self.output.write_event(EV,str(EVENTS['EventID'].iloc[e].astype(str)))
+            if self.CutMSEED == True:
+                self.output.cut_mseed(self.DATA,str(EVENTS['EventID'].iloc[e].astype(str)))
+
 
             # Outputting coalescence grids and triggered events
             if self.CoalescenceTrace == True:
