@@ -734,6 +734,7 @@ class SeisPlot:
         # ---------------- Plotting the Traces -----------
         STIn = np.where(self.times == self.EVENT['DT'].iloc[0])[0][0]
         ENIn = np.where(self.times == self.EVENT['DT'].iloc[-1])[0][0]
+        #print(STIn,ENIn)
 
 
 
@@ -774,7 +775,7 @@ class SeisPlot:
 
 #        Coa_Trace.set_ylim([0,ii+2])
         Coa_Trace.set_xlim([self.DATA.startTime+timedelta(seconds=1.6),np.max(TS)])
-        Coa_Trace.get_xaxis().set_ticks([])
+        #Coa_Trace.get_xaxis().set_ticks([])
         Coa_Trace.yaxis.tick_right()
         Coa_Trace.yaxis.set_ticks(StaInd+1)
         Coa_Trace.yaxis.set_ticklabels(self.DATA.StationInformation['Name'])
@@ -786,7 +787,7 @@ class SeisPlot:
         Coa_CoaVal.set_xlabel('Date-Time')
         Coa_CoaVal.yaxis.tick_right()
         Coa_CoaVal.yaxis.set_label_position("right")
-        Coa_CoaVal.set_xlim([self.times[STIn],self.times[ENIn]])
+        Coa_CoaVal.set_xlim([self.EVENT['DT'].iloc[0],self.EVENT['DT'].iloc[-1]])
         Coa_CoaVal.format_xdate = mdates.DateFormatter('%Y-%m-%d') #FIX - Not working
         for tick in Coa_CoaVal.get_xticklabels():
                 tick.set_rotation(45)
@@ -794,6 +795,7 @@ class SeisPlot:
 
 
 
+        # ------------- Spatial Function  ----------- 
 
         # Plotting the marginal window
         gridX,gridY = np.mgrid[min(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,0]):max(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,0]):(max(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,0]) - min(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,0]))/self.LUT.cell_count[0], min(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,1]):max(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,1]):(max(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,1]) - min(self.LUT.xyz2coord(self.LUT.get_grid_xyz())[:,1]))/self.LUT.cell_count[1]]
@@ -1299,10 +1301,10 @@ class SeisScan:
         for ee in range(1,np.max(IntEvents['EventNum'])+1):
             tmp = IntEvents[IntEvents['EventNum'] == ee].reset_index(drop=True)
             if d==0:
-                EVENTS = pd.DataFrame([[ee, tmp['CoaTime'].iloc[np.argmax(tmp['COA_V'])], np.max(tmp['COA_V']), tmp['COA_X'].iloc[np.argmax(tmp['COA_V'])], tmp['COA_X'].iloc[np.argmax(tmp['COA_V'])], tmp['COA_X'].iloc[np.argmax(tmp['COA_V'])],np.min(tmp['MinTime']),np.max(tmp['MaxTime'])]],columns=['EventNum','CoaTime','COA_V','COA_X','COA_Y','COA_Z','MinTime','MaxTime'])
+                EVENTS = pd.DataFrame([[ee, tmp['CoaTime'].iloc[np.argmax(tmp['COA_V'])], np.max(tmp['COA_V']), tmp['COA_X'].iloc[np.argmax(tmp['COA_V'])], tmp['COA_X'].iloc[np.argmax(tmp['COA_V'])], tmp['COA_X'].iloc[np.argmax(tmp['COA_V'])],tmp['CoaTime'].iloc[np.argmax(tmp['COA_V'])] + timedelta(seconds=-self.MarginalWindow),tmp['CoaTime'].iloc[np.argmax(tmp['COA_V'])] + timedelta(seconds=self.MarginalWindow)]],columns=['EventNum','CoaTime','COA_V','COA_X','COA_Y','COA_Z','MinTime','MaxTime'])
                 d+=1
             else:
-                EVENTS = EVENTS.append(pd.DataFrame([[ee, tmp['CoaTime'].iloc[np.argmax(tmp['COA_V'])], np.max(tmp['COA_V']), tmp['COA_X'].iloc[np.argmax(tmp['COA_V'])], tmp['COA_X'].iloc[np.argmax(tmp['COA_V'])], tmp['COA_X'].iloc[np.argmax(tmp['COA_V'])],np.min(tmp['MinTime']),np.max(tmp['MaxTime'])]],columns=['EventNum','CoaTime','COA_V','COA_X','COA_Y','COA_Z','MinTime','MaxTime']),ignore_index=True)
+                EVENTS = EVENTS.append(pd.DataFrame([[ee, tmp['CoaTime'].iloc[np.argmax(tmp['COA_V'])], np.max(tmp['COA_V']), tmp['COA_X'].iloc[np.argmax(tmp['COA_V'])], tmp['COA_X'].iloc[np.argmax(tmp['COA_V'])], tmp['COA_X'].iloc[np.argmax(tmp['COA_V'])],tmp['CoaTime'].iloc[np.argmax(tmp['COA_V'])] + timedelta(seconds=-self.MarginalWindow),tmp['CoaTime'].iloc[np.argmax(tmp['COA_V'])] + timedelta(seconds=self.MarginalWindow)]],columns=['EventNum','CoaTime','COA_V','COA_X','COA_Y','COA_Z','MinTime','MaxTime']),ignore_index=True)
 
 
 
@@ -1730,8 +1732,12 @@ class SeisScan:
         SNR_P = self.DATA.SNR_P
         SNR_S = self.DATA.SNR_S
 
-        ttp = self.lookup_table.value_at('TIME_P', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()]))).astype(int))[0]
-        tts = self.lookup_table.value_at('TIME_S', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].tolist()]))).astype(int))[0]
+        #print(EVENT_MaxCoa[['X','Y','Z']].iloc[0])
+
+        ttp = self.lookup_table.value_at('TIME_P', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].values]))).astype(int))[0]
+        tts = self.lookup_table.value_at('TIME_S', np.array(self.lookup_table.coord2xyz(np.array([EVENT_MaxCoa[['X','Y','Z']].values]))).astype(int))[0]
+        
+
         # Determining the stations that can be picked on and the phasese
         STATIONS=pd.DataFrame(columns=['Name','Phase','ModelledTime','PickTime','PickError'])
         c=0
@@ -1885,20 +1891,28 @@ class SeisScan:
             print('--Processing for Event {} of {} - {}'.format(e+1,len(EVENTS),(EVENTS['EventID'].iloc[e]).astype(str)))
 
             # Determining the Seismic event location
-            cstart = EVENTS['MinTime'].iloc[e] + timedelta(seconds = -self.pre_pad)
-            cend   = EVENTS['MaxTime'].iloc[e] + timedelta(seconds = self.post_pad)
+            cstart = EVENTS['MinTime'].iloc[e] + timedelta(seconds = -(self.pre_pad+self.MarginalWindow))
+            cend   = EVENTS['MaxTime'].iloc[e] + timedelta(seconds = (self.post_pad+self.MarginalWindow))
             self.DATA.read_mseed(cstart.strftime('%Y-%m-%dT%H:%M:%S.%f'),cend.strftime('%Y-%m-%dT%H:%M:%S.%f'),self.sample_rate)
 
             daten, dsnr, dloc, self.MAP = self._compute(cstart,cend,self.DATA.signal,self.DATA.station_avaliability)
+
             dcoord = self.lookup_table.xyz2coord(np.array(dloc).astype(int))
             EventCoaVal = pd.DataFrame(np.array((daten,dsnr,dcoord[:,0],dcoord[:,1],dcoord[:,2])).transpose(),columns=['DT','COA','X','Y','Z'])
             EventCoaVal['DT'] = pd.to_datetime(EventCoaVal['DT'])
 
+
+            # ----- Clipping the Coalescence and Values to the mariginal window size ----
+            indMAX = EventCoaVal['COA'].astype('float').idxmax()
+            indVal_min = int(indMAX - self.MarginalWindow*self.sample_rate)
+            indVal_max = round(indMAX + self.MarginalWindow*self.sample_rate)
+            EventCoaVal = EventCoaVal[['DT','COA','X','Y','Z']].iloc[indVal_min:indVal_max].reset_index(drop=True)
+            self.MAP = self.MAP[:,:,:,indVal_min:indVal_max]
             self.EVENT = EventCoaVal
-            self.EVENT_max = self.EVENT.iloc[np.argmax(self.EVENT['COA'])]
+            self.EVENT_max = self.EVENT.iloc[indMAX-indVal_min]
 
             # Determining the hypocentral location from the maximum over the marginal window.
-            Picks,GAUP,GAUS = self._ArrivalTrigger(self.EVENT.iloc[np.argmax(self.EVENT['COA'])],(EVENTS['EventID'].iloc[e].astype(str)))
+            Picks,GAUP,GAUS = self._ArrivalTrigger(self.EVENT_max,(EVENTS['EventID'].iloc[e].astype(str)))
 
             StationPick = {}
             StationPick['Pick'] = Picks
@@ -1908,7 +1922,7 @@ class SeisScan:
             # Determining earthquake location error
             LOC,LOC_ERR = self._LocationError(self.MAP)
 
-            EV = pd.DataFrame([np.append(self.EVENT.iloc[np.argmax(self.EVENT['COA'])].as_matrix(),[LOC[0],LOC[1],LOC[2],LOC_ERR[0],LOC_ERR[1],LOC_ERR[2]])],columns=['DT','COA','X','Y','Z','X_ErrE','Y_ErrE','Z_ErrE','ErrX','ErrY','ErrZ'])
+            EV = pd.DataFrame([np.append(self.EVENT_max.as_matrix(),[LOC[0],LOC[1],LOC[2],LOC_ERR[0],LOC_ERR[1],LOC_ERR[2]])],columns=['DT','COA','X','Y','Z','X_ErrE','Y_ErrE','Z_ErrE','ErrX','ErrY','ErrZ'])
             self.output.write_event(EV,str(EVENTS['EventID'].iloc[e].astype(str)))
             if self.CutMSEED == True:
                 self.output.cut_mseed(self.DATA,str(EVENTS['EventID'].iloc[e].astype(str)))

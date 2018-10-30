@@ -368,7 +368,6 @@ class Grid3D:
         Xmin,Ymin,Zmin = np.min(Bounds,axis=0)
         Xmax,Ymax,Zmax = np.max(Bounds,axis=0)
 
-
         if X < Xmin:
             X = np.array([Xmin + self._cell_size[0]/2])
         if X > Xmax:
