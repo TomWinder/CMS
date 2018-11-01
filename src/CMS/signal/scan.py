@@ -674,7 +674,7 @@ class SeisPlot:
                 else:
                    plt.savefig('{}_CoalescenceTrace_{}.pdf'.format(SaveFilename,self.LUT.station_data['Name'][ii]))
                    plt.close("all")
-                   
+
 
                 ii+=1
             
@@ -1904,9 +1904,13 @@ class SeisScan:
 
             # ----- Clipping the Coalescence and Values to the mariginal window size ----
             indMAX = EventCoaVal['COA'].astype('float').idxmax()
-            indVal_min = int(indMAX - self.MarginalWindow*self.sample_rate)
-            indVal_max = round(indMAX + self.MarginalWindow*self.sample_rate)
+            indVal_min = int(indMAX - self.MarginalWindow*float(self.sample_rate))
+            indVal_max = round(indMAX + self.MarginalWindow*float(self.sample_rate))
             EventCoaVal = EventCoaVal[['DT','COA','X','Y','Z']].iloc[indVal_min:indVal_max].reset_index(drop=True)
+
+            print(indVal_min,indMAX,indVal_max)
+
+
             self.MAP = self.MAP[:,:,:,indVal_min:indVal_max]
             self.EVENT = EventCoaVal
             self.EVENT_max = self.EVENT.iloc[indMAX-indVal_min]
