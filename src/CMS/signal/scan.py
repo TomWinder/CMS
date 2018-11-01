@@ -1908,7 +1908,7 @@ class SeisScan:
             indVal_max = round(indMAX + self.MarginalWindow*float(self.sample_rate))
             EventCoaVal = EventCoaVal[['DT','COA','X','Y','Z']].iloc[indVal_min:indVal_max].reset_index(drop=True)
 
-            print(indVal_min,indMAX,indVal_max)
+            #print(indVal_min,indMAX,indVal_max)
 
 
             self.MAP = self.MAP[:,:,:,indVal_min:indVal_max]
