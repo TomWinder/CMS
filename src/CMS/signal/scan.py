@@ -1891,8 +1891,8 @@ class SeisScan:
             print('--Processing for Event {} of {} - {}'.format(e+1,len(EVENTS),(EVENTS['EventID'].iloc[e]).astype(str)))
 
             # Determining the Seismic event location
-            cstart = EVENTS['MinTime'].iloc[e] + timedelta(seconds = -(self.pre_pad+self.MarginalWindow))
-            cend   = EVENTS['MaxTime'].iloc[e] + timedelta(seconds = (self.post_pad+self.MarginalWindow))
+            cstart = EVENTS['MinTime'].iloc[e] + timedelta(seconds = -2*(self.pre_pad+self.MarginalWindow))
+            cend   = EVENTS['MaxTime'].iloc[e] + timedelta(seconds = 2*(self.post_pad+self.MarginalWindow))
             self.DATA.read_mseed(cstart.strftime('%Y-%m-%dT%H:%M:%S.%f'),cend.strftime('%Y-%m-%dT%H:%M:%S.%f'),self.sample_rate)
 
             daten, dsnr, dloc, self.MAP = self._compute(cstart,cend,self.DATA.signal,self.DATA.station_avaliability)
