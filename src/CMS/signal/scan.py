@@ -1143,26 +1143,42 @@ class SeisScan:
 
         if self._map is None:
             #print('  Allocating memory: {}'.format(ncell + (tsamp,)))
-            self._map = np.zeros(ncell + (tsamp,), dtype=np.float64)
+            self._map = np.zeros(ncell + (nsamp,), dtype=np.float64)
 
-        dind = np.zeros(tsamp, np.int64)
-        dsnr = np.zeros(tsamp, np.double)
+        dind = np.zeros(nsamp, np.int64)
+        dsnr = np.zeros(nsamp, np.double)
 
-        ilib.scan(snr, tt, 0, pre_smp + nsamp +pos_smp, self._map, self.NumberOfCores)
-        ilib.detect(self._map, dsnr, dind, 0, pre_smp + nsamp +pos_smp, self.NumberOfCores)
+        # ilib.scan(snr, tt, 0, pre_smp + nsamp +pos_smp, self._map, self.NumberOfCores)
+        # ilib.detect(self._map, dsnr, dind, 0, pre_smp + nsamp +pos_smp, self.NumberOfCores)
+        # daten = np.arange((cstart+timedelta(seconds=self.pre_pad)), (cend + timedelta(seconds=-self.post_pad) + timedelta(seconds=1/srate)),timedelta(seconds=1/srate)) 
+        # dsnr = np.exp((dsnr / nchan) - 1.0)
+        # #dsnr = classic_sta_lta(np.exp((dsnr / nchan) - 1.0),self.onset_win_p1[0]*self.sample_rate*0.5,self.onset_win_p1[1]*self.sample_rate*0.5)
+        # dsnr = dsnr[pre_smp:pre_smp + nsamp]
+        # dloc  = self.lookup_table.index2xyz(dind[pre_smp:pre_smp + nsamp])
+        # MAP   = self._map[:,:,:,(pre_smp+1):pre_smp + nsamp]
 
 
+        print(snr.shape)
+        print(nsamp)
+        print(self.pre_pad)
+        print(self.post_pad)
+        ilib.scan(snr, tt, pre_smp, pos_smp, nsamp, self._map, self.NumberOfCores)
+        ilib.detect(self._map, dsnr, dind, 0,nsamp, self.NumberOfCores)
         daten = np.arange((cstart+timedelta(seconds=self.pre_pad)), (cend + timedelta(seconds=-self.post_pad) + timedelta(seconds=1/srate)),timedelta(seconds=1/srate)) 
         dsnr = np.exp((dsnr / nchan) - 1.0)
         #dsnr = classic_sta_lta(np.exp((dsnr / nchan) - 1.0),self.onset_win_p1[0]*self.sample_rate*0.5,self.onset_win_p1[1]*self.sample_rate*0.5)
-        dsnr = dsnr[pre_smp:pre_smp + nsamp]
+        dsnr = dsnr
+        dloc  = self.lookup_table.index2xyz(dind)
+        MAP   = self._map
 
-
-        dloc  = self.lookup_table.index2xyz(dind[pre_smp:pre_smp + nsamp])
-
-        MAP   = self._map[:,:,:,(pre_smp+1):pre_smp + nsamp]
 
         self._map = None
+
+        print(daten)
+        print(daten.shape)
+        print(dsnr.shape)
+        print(dloc.shape)
+        print(MAP.shape)
         return daten, dsnr, dloc, MAP
 
 
@@ -1891,8 +1907,8 @@ class SeisScan:
             print('--Processing for Event {} of {} - {}'.format(e+1,len(EVENTS),(EVENTS['EventID'].iloc[e]).astype(str)))
 
             # Determining the Seismic event location
-            cstart = EVENTS['MinTime'].iloc[e] + timedelta(seconds = -2*(self.pre_pad+self.MarginalWindow))
-            cend   = EVENTS['MaxTime'].iloc[e] + timedelta(seconds = 2*(self.post_pad+self.MarginalWindow))
+            cstart = EVENTS['MinTime'].iloc[e] + timedelta(seconds=-self.pre_pad) 
+            cend   = EVENTS['MaxTime'].iloc[e] + timedelta(seconds=self.post_pad)
             self.DATA.read_mseed(cstart.strftime('%Y-%m-%dT%H:%M:%S.%f'),cend.strftime('%Y-%m-%dT%H:%M:%S.%f'),self.sample_rate)
 
             daten, dsnr, dloc, self.MAP = self._compute(cstart,cend,self.DATA.signal,self.DATA.station_avaliability)
@@ -1900,20 +1916,8 @@ class SeisScan:
             dcoord = self.lookup_table.xyz2coord(np.array(dloc).astype(int))
             EventCoaVal = pd.DataFrame(np.array((daten,dsnr,dcoord[:,0],dcoord[:,1],dcoord[:,2])).transpose(),columns=['DT','COA','X','Y','Z'])
             EventCoaVal['DT'] = pd.to_datetime(EventCoaVal['DT'])
-
-
-            # ----- Clipping the Coalescence and Values to the mariginal window size ----
-            indMAX = EventCoaVal['COA'].astype('float').idxmax()
-            indVal_min = int(indMAX - self.MarginalWindow*float(self.sample_rate))
-            indVal_max = round(indMAX + self.MarginalWindow*float(self.sample_rate))
-            EventCoaVal = EventCoaVal[['DT','COA','X','Y','Z']].iloc[indVal_min:indVal_max].reset_index(drop=True)
-
-            #print(indVal_min,indMAX,indVal_max)
-
-
-            self.MAP = self.MAP[:,:,:,indVal_min:indVal_max]
             self.EVENT = EventCoaVal
-            self.EVENT_max = self.EVENT.iloc[indMAX-indVal_min]
+            self.EVENT_max = self.EVENT.iloc[EventCoaVal['COA'].astype('float').idxmax()]
 
             # Determining the hypocentral location from the maximum over the marginal window.
             Picks,GAUP,GAUS = self._ArrivalTrigger(self.EVENT_max,(EVENTS['EventID'].iloc[e].astype(str)))

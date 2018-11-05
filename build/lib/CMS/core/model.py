@@ -12,7 +12,7 @@ from copy import copy
 
 import numpy as np
 import pyproj
-from scipy.interpolate import RectBivariateSpline, RegularGridInterpolator, griddata
+from scipy.interpolate import RectBivariateSpline, RegularGridInterpolator, griddata, interp1d
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pylab as plt
@@ -83,14 +83,30 @@ def _proj_wgs84():
 def _proj_nad27():
     return pyproj.Proj("+proj=longlat +ellps=clrk66 +datum=NAD27 +no_defs")  # "+init=EPSG:4267"
 
+def _utm_zone(longitude):
+    return (int(1 + math.fmod((longitude + 180.0) / 6.0, 60)))
 
 def _proj_wgs84_utm(longitude):
-    zone = (int(1 + math.fmod((longitude + 180.0) / 6.0, 60)))
+    zone = _utm_zone(longitude)
     return pyproj.Proj("+proj=utm +zone={0:d} +datum=WGS84 +units=m +no_defs".format(zone))
 
+def _proj_wgs84_lambertcc(lon_Org,lat_Org,lat_1pl,lat_2pl):
+    return pyproj.Proj("+proj=lcc +lon_0={} +lat_0={} +lat_1={} +lat_2={} +datum=WGS84 +units=m +no_defs".format(float(lon_Org),float(lat_Org),float(lat_1pl),float(lat_2pl)))
 
-def eikonal(x,y,z,V,S):
-    ''' 
+def _proj_wgs84_tm(lon_Org,lat_Org):
+    return pyproj.Proj("+proj=tmerc +lon_0={} +lat_0={} +datum=WGS84 +units=m +no_defs".format(float(lon_Org),float(lat_Org)))
+
+
+# def _proj_nlloc_simple(latOrg,lonOrg,rotAngle):
+#     x = (long - longOrig) * 111.111 * cos(lat_radians)
+#     y = (lat - latOrig) * 111.111
+#     lat = latOrig + y / 111.111
+#     long = longOrig + x / (111.111 * cos(lat_radians))
+#     x=(lon)
+
+
+def eikonal(ix,iy,iz,dxi,dyi,dzi,V,S):
+    '''
         Travel-Time formulation using a simple eikonal method.
         Requires the skifmm python package.
 
@@ -102,41 +118,13 @@ def eikonal(x,y,z,V,S):
             S - Definition of the station location in grid
 
         Outputs:
-            t - Travel-time numpy array 
+            t - Travel-time numpy array
 
     '''
-    t=[]
-
-    dx = float(x[1]-x[0])
-    phi = -1*np.ones_like(V)    
-
-    if S.ndim==1:
-        S=np.array([S]);
-        ns=1
-        ns, ndim = S.shape
-    else:
-        ns, ndim = S.shape
-
-    for i in range(ns):
-        # get location of source
-        #print(i)
-        ix = np.abs(x-S[i,0]).argmin();
-        if ndim>1:
-            iy = np.abs(y-S[i,1]).argmin();
-        if ndim>2:
-            iz = np.abs(z-S[i,2]).argmin();
-    
-        if ndim>2:
-            phi[iy,ix,iz]=1;    
-        elif ndim>1:
-            phi[iy,ix]=1;    
-        else:
-            phi[ix]=1;
-    
-        t_comp = skfmm.travel_time(phi, V, dx)
-    
-        t.append(t_comp)
-    
+    phi = -np.ones(ix.shape)
+    indx = np.argmin(abs((ix - S[:,0])) + abs((iy - S[:,1])) + abs((iz - S[:,2])))
+    phi[np.unravel_index(indx,ix.shape)] = 1.0
+    t = skfmm.travel_time(phi,V,dx=[dxi,dyi,dzi])
     return t
 
 
@@ -160,6 +148,8 @@ class Grid3D:
         self.grid_azimuth = azimuth
         self.grid_dip = dip
         self.sort_order = sort_order
+        self.UTM_zones_different = False
+        self.lcc_standard_parallels=(0.0,0.0)
 
     @property
     def grid_center(self):
@@ -241,6 +231,15 @@ class Grid3D:
             self._grid_proj = grid_proj
         self._update_coord()
 
+    def _nlloc_grid_proj(self):
+        if self.NLLoc_proj:
+            if self.NLLoc_proj == 'SIMPLE':
+                return "ERROR -- simple not yet supported"
+            elif self.NLLoc_proj == 'LAMBERT':
+                return _proj_wgs84_lambertcc(self.NLLoc_MapOrg[0],self.NLLoc_MapOrg[1],self.NLLoc_MapOrg[4],self.NLLoc_MapOrg[5])
+            elif self.NLLoc_proj == 'TRANS_MERC':
+                return _proj_wgs84_tm(self.NLLoc_MapOrg[0],self.NLLoc_MapOrg[1])
+
     def get_grid_proj(self):
         if self._grid_proj is None:
             warnings.warn("Grid Projection has not been set: Assuming WGS84")
@@ -274,6 +273,23 @@ class Grid3D:
         else:
             return False
 
+    def get_NLLOC_gridcenter(self,NLLOCorg_lon,NLLOCorg_lat):
+        self._longitude = NLLOCorg_lon
+        self._coord_proj = _proj_wgs84()
+        if self.NLLoc_proj is not 'NONE':
+            self._grid_proj = self._nlloc_grid_proj()
+        self.grid_origin_xy=self.lonlat2xy(NLLOCorg_lon,NLLOCorg_lat)
+        self._grid_center[0],self._grid_center[1]=(self.grid_origin_xy[0]+self.center[0],self.grid_origin_xy[1]+self.center[1])
+        self._longitude,self._latitude=self.xy2lonlat(self._grid_center[0],self._grid_center[1])
+        # if _utm_zone(self.longitude) != _utm_zone(NLLOCorg_lon):
+        #     self.UTM_zones_different=True
+        #     self._coord_proj = _proj_wgs84()
+        #     self._grid_proj = _proj_wgs84_utm(self.longitude)
+        #     self.grid_origin_xy=self.lonlat2xy(NLLOCorg_lon,NLLOCorg_lat)
+        #     self._grid_center[0],self._grid_center[1]=(self.grid_origin_xy[0]+self.center[0],self.grid_origin_xy[1]+self.center[1])
+        #     self._longitude,self._latitude=self.xy2lonlat(self._grid_center[0],self._grid_center[1])
+        self._update_grid_center()
+
     def set_lonlat(self, longitude=None, latitude=None, coord_proj=None, grid_proj=None):
         if coord_proj:
             self._coord_proj = coord_proj
@@ -285,9 +301,16 @@ class Grid3D:
             self._longitude = longitude
         self._update_grid_center()
 
-    def setproj_wgs84(self):
+    def setproj_wgs84(self,proj):
         self._coord_proj = _proj_wgs84()
-        self._grid_proj = _proj_wgs84_utm(self.longitude)
+        if proj == 'UTM':
+            self._grid_proj = _proj_wgs84_utm(self.longitude)
+        elif proj == 'LCC':
+            self._grid_proj = _proj_wgs84_lambertcc(self.longitude,self.latitude,self.lcc_standard_parallels[0],self.lcc_standard_parallels[1])
+        elif proj == 'TM':
+            self._grid_proj = _proj_wgs84_tm(self.longitude,self.latitude)
+        else:
+            raise Exception('Projection type must be specified! CMS currently supports UTM, LCC (Lambert Conical Conformic) or TM (Transverse Mercator)')
         if not self._update_grid_center():
             self._update_coord()
 
@@ -333,10 +356,32 @@ class Grid3D:
     def loc2coord(self,loc):
         return self.xyz2coord(self.loc2xyz(loc))
 
+    def coord2loc(self,loc):
+        return self.xyz2loc(self.coord2xyz(loc))
+
 
     def coord2xyz(self, loc):
         X, Y = self.lonlat2xy(loc[:,0], loc[:,1])
-        return np.array([X, Y, loc[:,2]]).transpose()
+        Z = loc[:,2]
+
+        Bounds = self.get_grid_xyz()
+        Xmin,Ymin,Zmin = np.min(Bounds,axis=0)
+        Xmax,Ymax,Zmax = np.max(Bounds,axis=0)
+
+        if X < Xmin:
+            X = np.array([Xmin + self._cell_size[0]/2])
+        if X > Xmax:
+            X = np.array([Xmax - self._cell_size[0]/2])
+        if Y < Ymin:
+            Y = np.array([Ymin + self._cell_size[1]/2])
+        if Y >  Ymax:
+            Y = np.array([Ymax - self._cell_size[1]/2])
+        if Z < Zmin:
+            Z = np.array([Zmin + self._cell_size[2]/2])
+        if Z > Zmax:
+            Z = np.array([Zmax - self._cell_size[2]/2])
+
+        return np.array([X,Y,Z]).transpose()
 
     def coord2index(self,coord):
         return self.loc2index(self.coord2loc(coord))
@@ -414,11 +459,14 @@ class NonLinLoc:
             self.NLLoc_MapOrg  =  [trans[5],trans[3],trans[7],'Simple','0.0','0.0']
         if trans[1] == 'LAMBERT':
             self.NLLoc_proj    = 'LAMBERT'
-            print([trans[7],trans[5],trans[13],trans[3],trans[9],trans[11]])
             self.NLLoc_MapOrg  =  [trans[7],trans[5],trans[13],trans[3],trans[9],trans[11]]
+        if trans[1] == 'TRANS_MERC':
+            self.NLLoc_proj    = 'TRANS_MERC'
+            self.NLLoc_MapOrg  =  [trans[7],trans[5],trans[9],trans[3],'0.0','0.0']
 
 
-        # Reading the buf file 
+
+        # Reading the buf file
         fid = open('{}.buf'.format(FileName),'rb')
         data = struct.unpack('{}f'.format(self.NLLoc_n[0]*self.NLLoc_n[1]*self.NLLoc_n[2]),fid.read(self.NLLoc_n[0]*self.NLLoc_n[1]*self.NLLoc_n[2]*4))
         self.NLLoc_data = np.array(data).reshape(self.NLLoc_n[0],self.NLLoc_n[1],self.NLLoc_n[2])
@@ -426,11 +474,11 @@ class NonLinLoc:
 
     def NLLOC_ProjectGrid(self):
         '''
-            Projecting the grid to the new coordinate system. This function also determines the 3D grid from the 2D 
-            grids from NonLinLoc 
+            Projecting the grid to the new coordinate system. This function also determines the 3D grid from the 2D
+            grids from NonLinLoc
         '''
 
-        # Generating the correct NonLinLoc Formated Grid
+        # Generating the correct NonLinLoc Formatted Grid
         if (self.NLLoc_proj == 'NONE'):
             GRID_NLLOC = Grid3D(center=(self.NLLoc_org + self.NLLoc_siz*self.NLLoc_n), cell_count=self.NLLoc_n,cell_size=self.NLLoc_siz,azimuth=0.0, dip=0.0, sort_order='C')
 
@@ -438,8 +486,12 @@ class NonLinLoc:
             GRID_NLLOC = Grid3D(center=(self.NLLoc_org + self.NLLoc_siz*self.NLLoc_n), cell_count=self.NLLoc_n,cell_size=self.NLLoc_siz,azimuth=self.NLLoc_MapOrg[2], dip=0.0, sort_order='C')
             GRID_NLLOC.set_lonlat(self.NLLoc_MapOrg[0],self.NLLoc_MapOrg[1])
 
-
         if (self.NLLoc_proj == 'LAMBERT'):
+            GRID_NLLOC = Grid3D(center=(self.NLLoc_org + self.NLLoc_siz*self.NLLoc_n), cell_count=self.NLLoc_n,cell_size=self.NLLoc_siz,azimuth=self.NLLoc_MapOrg[2], dip=0.0, sort_order='C')
+            GRID_NLLOC.set_lonlat(self.NLLoc_MapOrg[0],self.NLLoc_MapOrg[1])
+            GRID_NLLOC.set_proj(self.NLLoc_MapOrg[3])
+
+        if (self.NLLoc_proj == 'TRANS_MERC'):
             GRID_NLLOC = Grid3D(center=(self.NLLoc_org + self.NLLoc_siz*self.NLLoc_n), cell_count=self.NLLoc_n,cell_size=self.NLLoc_siz,azimuth=self.NLLoc_MapOrg[2], dip=0.0, sort_order='C')
             GRID_NLLOC.set_lonlat(self.NLLoc_MapOrg[0],self.NLLoc_MapOrg[1])
             GRID_NLLOC.set_proj(self.NLLoc_MapOrg[3])
@@ -454,7 +506,7 @@ class NonLinLoc:
 
     def NLLOC_RedefineGrid(self,Decimate):
         '''
-            Redefining coordinate system to the file loaded 
+            Redefining coordinate system to the file loaded
         '''
 
         # Decimating the grid by the factor defined
@@ -468,18 +520,21 @@ class NonLinLoc:
         if (self.NLLoc_proj == 'NONE'):
             self.azimuth    = 0.0
             self.grid_center = self.center
-        
+
         if (self.NLLoc_proj == 'SIMPLE'):
             self.azimuth = self.NLLoc_MapOrg[2]
-            self.set_lonlat(self.NLLoc_MapOrg[0],self.NLLoc_MapOrg[1])
-            self.grid_center = self.center
-            self.setproj_wgs84()
+            self.get_NLLOC_gridcenter(float(self.NLLoc_MapOrg[0]),float(self.NLLoc_MapOrg[1]))
+            self.grid_center[2] = self.center[2]
 
         if (self.NLLoc_proj == 'LAMBERT'):
-            self.azimuth = self.NLLoc_MapOrg[2]
-            self.set_lonlat(self.NLLoc_MapOrg[0],self.NLLoc_MapOrg[1])
-            self.grid_center = self.center
-            self.setproj_wgs84()
+            self.azimuth = float(self.NLLoc_MapOrg[2])
+            self.get_NLLOC_gridcenter(float(self.NLLoc_MapOrg[0]),float(self.NLLoc_MapOrg[1]))
+            self.grid_center[2] = self.center[2]
+
+        if (self.NLLoc_proj == 'TRANS_MERC'):
+            self.azimuth = float(self.NLLoc_MapOrg[2])
+            self.get_NLLOC_gridcenter(float(self.NLLoc_MapOrg[0]),float(self.NLLoc_MapOrg[1]))
+            self.grid_center[2] = self.center[2]
 
         self.NLLoc_data = self.decimate_array(self.NLLoc_data,np.array(Decimate))[:,:,::-1]
 
@@ -501,10 +556,10 @@ class LUT(Grid3D,NonLinLoc):
     '''
 
     #   Additions to be made to the program:
-    #       - Weighting of the stations with distance, allow the user to define their own tables 
-    #         or define a fixed weighting for the problem. 
+    #       - Weighting of the stations with distance, allow the user to define their own tables
+    #         or define a fixed weighting for the problem.
     #
-    #       - 
+    #       -
     #
     #
 
@@ -518,7 +573,7 @@ class LUT(Grid3D,NonLinLoc):
         self.velocity_model = None
         self.station_data = None
         self._maps = dict()
-        self.data = None 
+        self.data = None
 
     @property
     def maps(self):
@@ -539,8 +594,8 @@ class LUT(Grid3D,NonLinLoc):
                 flag[i] = True
 
     def decimate(self, ds, inplace=False):
-        ''' 
-            Function used to decimate the travel-time tables either supplied by NonLinLoc or through 
+        '''
+            Function used to decimate the travel-time tables either supplied by NonLinLoc or through
             the inbuilt functions:
 
 
@@ -582,7 +637,7 @@ class LUT(Grid3D,NonLinLoc):
         self.center = center
 
         ARRAY = np.ascontiguousarray(DATA[c1[0]::ds[0], c1[1]::ds[1], c1[2]::ds[2]])
-        return ARRAY 
+        return ARRAY
 
 
     def get_station_xyz(self, station=None):
@@ -668,10 +723,10 @@ class LUT(Grid3D,NonLinLoc):
 
 
     def compute_Homogeous(self,VP,VS):
-        ''' 
-            Function used to compute Travel-time tables in a homogeous 
+        '''
+            Function used to compute Travel-time tables in a homogeous
             velocity model
-            
+
             Input:
                 VP - P-wave velocity (km/s, float)
                 VS - S-wave velocity (km/s, float)
@@ -692,9 +747,6 @@ class LUT(Grid3D,NonLinLoc):
         self.maps = {'TIME_P': map_p1, 'TIME_S': map_s1}
 
 
-
-
-
     def compute_1DVelocity(self,Z,VP,VS):
         '''
             Function used to compute Travel-time tables in a 1D Velocity model
@@ -710,65 +762,75 @@ class LUT(Grid3D,NonLinLoc):
         #      Interpolating the velocity model to each point in the 3D grid. Defined Smoothing parameter based by
 
 
-        stn = self.get_station_xyz()
-        coord = self.get_grid_xyz()
-        ix, iy, iz = self.get_grid_xyz(cells='all')
-        ttp = np.zeros(ix.shape + (nstn,))
-        tts = np.zeros(ix.shape + (nstn,))
 
-        gvp = np.interp(iz, -Z, VP)
-        gvs = np.interp(iz, -Z, VS)
-
-
-        for s in range(stn.shape[0]):
-            print("Generating 1D Travel-Time Table - {}".format(i))
-
-            x = np.arange(min(coord[:,0]),max(coord[:,0]),self.cell_size[0])
-            y = np.arange(min(coord[:,1]),max(coord[:,1]),self.cell_size[1])
-            Z = np.arange(min(coord[:,2]),max(coord[:,2]),self.cell_size[2])
-
-            ttp[..., p] = eikonal(x,y,z,gvp,np.array([s]))[0]
-            tts[..., s] = eikonal(x,y,z,gvs,np.array([s]))[0]
-
-        self.maps = {'TIME_P': ttp1, 'TIME_S': tts}
-
-
-    def compute_3DVelocity(self,INPUT_FILE):
-        '''
-            Function used to compute Travel-time tables in a 1D Velocity model
-            defined using the input VP and VS arrays
-
-            INPUTS:
-                INPUT_FILE - File containg comma seperated X,Y,Z,VP,VS
-
-
-        '''
-        # Constructing the velocity model
-        #      Interpolating the velocity model to each point in the 3D grid. Defined Smoothing parameter based by
-
-        VEL = pd.read_csv(INPUT_FILE,names=['X','Y','Z','VP','VS'])
 
         stn = self.get_station_xyz()
         coord = self.get_grid_xyz()
         ix, iy, iz = self.get_grid_xyz(cells='all')
-        ttp = np.zeros(ix.shape + (nstn,))
-        tts = np.zeros(ix.shape + (nstn,))
+        ttp = np.zeros(ix.shape + (stn.shape[0],))
+        tts = np.zeros(ix.shape + (stn.shape[0],))
 
-        gvp = scipy.interpolate.griddata(VEL[['X','Y','Z']], VEL['VP'], (ix,iy,iz), 'linear')
-        gvs = scipy.interpolate.griddata(VEL[['X','Y','Z']], VEL['VP'], (ix,iy,iz), 'linear')
+        Z  = np.insert(np.append(Z,-np.inf),0,np.inf)
+#        print(Z)
+        VP = np.insert(np.append(VP,VP[-1]),0,VP[0])
+        VS = np.insert(np.append(VS,VS[-1]),0,VS[0])
+
+        f = interp1d(Z,VP)
+        gvp = f(iz)
+        f = interp1d(Z,VS)
+        gvs = f(iz)
 
 
         for s in range(stn.shape[0]):
-            print("Generating 1D Travel-Time Table - {}".format(i))
+            print("Generating 1D Travel-Time Table - {} of {}".format(s+1,stn.shape[0]))
 
             x = np.arange(min(coord[:,0]),max(coord[:,0]),self.cell_size[0])
-            y = np.arange(min(coord[:,1]),max(coord[:,1]),self.cell_size[1])
-            Z = np.arange(min(coord[:,2]),max(coord[:,2]),self.cell_size[2])
+            y = -np.arange(min(coord[:,1]),max(coord[:,1]),self.cell_size[1])
+            z = np.arange(min(coord[:,2]),max(coord[:,2]),self.cell_size[2])
 
-            ttp[..., p] = eikonal(x,y,z,gvp,np.array([s]))[0]
-            tts[..., s] = eikonal(x,y,z,gvs,np.array([s]))[0]
+            #print(eikonal(x,y,z,gvp,np.array([s])))
 
-        self.maps = {'TIME_P': ttp1, 'TIME_S': tts}
+            ttp[..., s] = eikonal(ix,iy,iz,self.cell_size[0],self.cell_size[1],self.cell_size[2],gvp,stn[s][np.newaxis,:])
+            tts[..., s] = eikonal(ix,iy,iz,self.cell_size[0],self.cell_size[1],self.cell_size[2],gvs,stn[s][np.newaxis,:])
+
+        self.maps = {'TIME_P': ttp, 'TIME_S': tts}
+
+#    def compute_3DVelocity(self,INPUT_FILE):
+#        '''
+#            Function used to compute Travel-time tables in a 1D Velocity model
+#            defined using the input VP and VS arrays
+
+#            INPUTS:
+#                INPUT_FILE - File containg comma seperated X,Y,Z,VP,VS
+
+
+#        '''
+#        # Constructing the velocity model
+#        #      Interpolating the velocity model to each point in the 3D grid. Defined Smoothing parameter based by
+
+#        VEL = pd.read_csv(INPUT_FILE,names=['X','Y','Z','VP','VS'])
+
+#        stn = self.get_station_xyz()
+#        coord = self.get_grid_xyz()
+#        ix, iy, iz = self.get_grid_xyz(cells='all')
+#        ttp = np.zeros(ix.shape + (nstn,))
+#        tts = np.zeros(ix.shape + (nstn,))
+
+#        gvp = scipy.interpolate.griddata(VEL[['X','Y','Z']], VEL['VP'], (ix,iy,iz), 'linear')
+#        gvs = scipy.interpolate.griddata(VEL[['X','Y','Z']], VEL['VP'], (ix,iy,iz), 'linear')
+
+
+#        for s in range(stn.shape[0]):
+#            print("Generating 1D Travel-Time Table - {}".format(i))
+
+#            x = np.arange(min(coord[:,0]),max(coord[:,0]),self.cell_size[0])
+#            y = np.arange(min(coord[:,1]),max(coord[:,1]),self.cell_size[1])
+#            Z = np.arange(min(coord[:,2]),max(coord[:,2]),self.cell_size[2])
+
+#            ttp[..., p] = eikonal(x,y,z,gvp,stn[s][np.newaxis,:])[0]
+#            tts[..., s] = eikonal(x,y,z,gvs,stn[s][np.newaxis,:])[0]
+
+#        self.maps = {'TIME_P': ttp1, 'TIME_S': tts}
 
 
 
@@ -776,12 +838,12 @@ class LUT(Grid3D,NonLinLoc):
     def compute_3DNLLoc(self,PATH,RedefineCoord=False,Decimate=[1,1,1]):
 
         '''
-            Function to read in NonLinLoc Tables to be used for the Travel-Time  
-            tables. 
+            Function to read in NonLinLoc Tables to be used for the Travel-Time
+            tables.
 
             INPUTS:
                 PATH - Full path to where the .buf and .hdr files can be found from
-                        the NonLinLoc output files 
+                        the NonLinLoc output files
 
 
 
@@ -790,13 +852,13 @@ class LUT(Grid3D,NonLinLoc):
         for st in range(nstn):
             name = self.station_data['Name'][st]
             print('Loading TTp and TTs for {}'.format(name))
-            
+
             # Reading in P-wave
             self.NLLOC_LoadFile('{}.P.{}.time'.format(PATH,name))
 
             if (RedefineCoord == False):
                 self.NLLOC_ProjectGrid()
-            else:              
+            else:
                 self.NLLOC_RedefineGrid(Decimate)
 
             if ('map_p1' not in locals()) and ('map_s1' not in locals()):
@@ -821,7 +883,7 @@ class LUT(Grid3D,NonLinLoc):
 
 
         self.maps = {'TIME_P':map_p1, 'TIME_S':map_s1}
- 
+
 
     def save(self,FILENAME):
         '''
@@ -843,7 +905,7 @@ class LUT(Grid3D,NonLinLoc):
 
 
     def plot_station(self):
-        ''' 
+        '''
             Function to plot a 2D representation of the station locations
 
         '''
@@ -925,4 +987,4 @@ class LUT(Grid3D,NonLinLoc):
     #     else:
     #         plt.show()
 
- 
+

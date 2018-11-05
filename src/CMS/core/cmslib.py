@@ -91,12 +91,12 @@ def nlevinson(acc):
 
 
 
-_cmslib.scan4d.argtypes = [c_dPt,  c_i32Pt, c_dPt,c_int32, c_int32, c_int32, c_int32, c_int64, c_int64]
-_cmslib.detect4d.argtypes = [c_dPt, c_dPt,c_i64Pt,c_int32, c_int32, c_int32, c_int64, c_int64]
-_cmslib.detect4d_t.argtypes = [c_dPt, c_dPt, c_i64Pt,c_int32, c_int32, c_int32, c_int64, c_int64]
+_cmslib.scan4d.argtypes = [c_dPt,  c_i32Pt, c_dPt, c_int32,  c_int32, c_int32, c_int32, c_int64, c_int64]
+_cmslib.detect4d.argtypes = [c_dPt, c_dPt, c_i64Pt,c_int32, c_int32, c_int32, c_int64, c_int64]
+# _cmslib.detect4d_t.argtypes = [c_dPt, c_dPt, c_i64Pt,c_int32, c_int32, c_int32, c_int64, c_int64]
 
-def scan(sig, tt, fsmp, lsmp, map4d,threads):
-    nstn, nsamp = sig.shape
+def scan(sig, tt, fsmp,lsmp, nsamp, map4d, threads):
+    nstn, ssmp = sig.shape
     if not tt.shape[-1] == nstn:
         raise ValueError('Mismatch between number of stations for data and LUT, {} - {}.'.format(
             nstn, tt.shape[-1]))
@@ -104,24 +104,27 @@ def scan(sig, tt, fsmp, lsmp, map4d,threads):
     tcell = np.prod(ncell)
     if map4d.size < nsamp*tcell:
         raise ValueError('4D-Array is too small.')
-    _cmslib.scan4d(sig, tt, map4d, c_int32(fsmp), c_int32(lsmp),
-                 c_int32(nsamp), c_int32(nstn),  c_int64(tcell), c_int64(threads))
+
+    if sig.size < nsamp + fsmp:
+        raise ValueError('Data array smaller than Coalescence array')
 
 
-def detect(mmap, dsnr, dind, fsmp, lsmp, threads):
+    _cmslib.scan4d(sig, tt, map4d, c_int32(fsmp), c_int32(lsmp),c_int32(nsamp), c_int32(nstn),  c_int64(tcell), c_int64(threads))
+
+
+def detect(mmap, dsnr, dind, fsmp, lsmp,threads):
     nsamp = mmap.shape[-1]
     ncell = np.prod(mmap.shape[:-1])
     if dsnr.size < nsamp or dind.size < nsamp:
         raise ValueError('Ouput array size too small, sample count = {}.'.format(nsamp))
-    _cmslib.detect4d(mmap, dsnr, dind, c_int32(fsmp), c_int32(lsmp),
-                   c_int32(nsamp), c_int64(ncell), c_int64(threads))
+    _cmslib.detect4d(mmap, dsnr, dind, c_int32(fsmp),c_int32(lsmp),c_int32(nsamp), c_int64(ncell), c_int64(threads))
 
 
-def detect_t(mmap, dsnr, dind, fsmp, lsmp, threads):
-    nsamp = mmap.shape[0]
-    ncell = np.prod(mmap.shape[1:])
-    if dsnr.size < nsamp or dind.size < nsamp:
-        raise ValueError('Ouput array size too small, sample count = {}.'.format(nsamp))
-    _cmslib.detect4d_t(mmap, dsnr, dind, c_int32(fsmp), c_int32(lsmp),
-                     c_int32(nsamp), c_int64(ncell), c_int64(threads))
+# def detect_t(mmap, dsnr, dind, fsmp, lsmp, threads):
+#     nsamp = mmap.shape[0]
+#     ncell = np.prod(mmap.shape[1:])
+#     if dsnr.size < nsamp or dind.size < nsamp:
+#         raise ValueError('Ouput array size too small, sample count = {}.'.format(nsamp))
+#     _cmslib.detect4d_t(mmap, dsnr, dind, c_int32(fsmp), c_int32(lsmp),
+#                      c_int32(nsamp), c_int64(ncell), c_int64(threads))
 

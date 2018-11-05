@@ -4,6 +4,8 @@
 # ---- Import Packages -----
 import obspy
 from obspy import UTCDateTime
+import CMS.core.model as cmod
+
 
 from datetime import datetime
 from datetime import timedelta
@@ -26,11 +28,7 @@ def _downsample(st,sr):
 
 class MSEED():
 
-    def __init__(self,lut,HOST_PATH='/PATH/MSEED'):
-
-        
-        self.lookup_table        = lut
-
+    def __init__(self,LUT,HOST_PATH='/PATH/MSEED'):
         self.startTime           = None
         self.endTime             = None
         self.sampling_rate       = None
@@ -41,7 +39,12 @@ class MSEED():
         self.signal              = None
         self.FilteredSignal      = None
         self.StationAvaliability = None
+
+        lut = cmod.LUT()
+        lut.load(LUT)
         self.StationInformation  = lut.station_data
+        del lut
+        self.st                  = None
 
 
     def _stationAvaliability(self,st):
@@ -53,17 +56,16 @@ class MSEED():
 
         # Since the traces are the same sample-rates then the stations can be selected based
         #on the start and end time
-        exSamples = (endT-stT).total_seconds()*self.sampling_rate + 1
+        exSamples = round((endT-stT).total_seconds()*self.sampling_rate + 1)
 
+        stationAva = np.zeros((len(self.StationInformation['Name']),1))
+        signal     = np.zeros((3,len(self.StationInformation['Name']),int(exSamples)))
 
-        stationAva = np.zeros((len(self.lookup_table.station_data['Name']),1))
-        signal     = np.zeros((3,len(self.lookup_table.station_data['Name']),int(exSamples)))
+        for i in range(0,len(self.StationInformation['Name'])):
 
-        for i in range(0,len(self.lookup_table.station_data['Name'])):
-
-            tmp_st = st.select(station=self.lookup_table.station_data['Name'][i])
+            tmp_st = st.select(station=self.StationInformation['Name'][i])
             if len(tmp_st) == 3:
-                if tmp_st[0].stats.npts == exSamples and tmp_st[1].stats.npts == exSamples and tmp_st[2].stats.npts == exSamples:
+                if tmp_st[0].stats.npts <= exSamples and tmp_st[1].stats.npts == exSamples and tmp_st[2].stats.npts == exSamples:
                     # Defining the station as avaliable
                     stationAva[i] = 1
                     
@@ -82,9 +84,6 @@ class MSEED():
                 # Trace not completly active during this period
                 continue 
 
-
-
-
         return signal,stationAva
 
 
@@ -98,7 +97,8 @@ class MSEED():
         if TYPE == 'YEAR/JD/STATION':
             self.Type  = 'YEAR/JD/STATION'
 
-
+        if TYPE == 'STATION.YEAR.JULIANDAY':
+            self.Type = 'STATION.YEAR.JULIANDAY'
 
 
     def _load_fromPath(self):
@@ -113,14 +113,31 @@ class MSEED():
         if self.Type == 'YEAR/JD/STATION':
             dy = 0
             FILES = []
-            while (self.endTime.timetuple().tm_yday) >= (self.startTime + timedelta(days=dy)).timetuple().tm_yday:
+            #print(float(self.endTime.year) + float('0.{}'.format(self.endTime.timetuple().tm_yday)))
+            #print(float(self.startTime.year) + float('0.{}'.format((self.startTime + timedelta(days=dy)).timetuple().tm_yday)))
+            while self.endTime.timetuple().tm_yday >=  (self.startTime + timedelta(days=dy)).timetuple().tm_yday:
                 # Determine current time
                 ctime = self.startTime + timedelta(days=dy)
-
-                for st in self.lookup_table.station_data['Name'].tolist():
-                    FILES.extend(glob('{}/{}/{}/*{}*'.format(self.MSEED_path,ctime.year,ctime.timetuple().tm_yday,st)))
+                #print(ctime)
+                for st in self.StationInformation['Name'].tolist():
+                    FILES.extend(glob('{}/{}/{}/*{}*'.format(self.MSEED_path,ctime.year,str(ctime.timetuple().tm_yday).zfill(3),st)))
 
                 dy += 1 
+
+        if self.Type == 'STATION.YEAR.JULIANDAY':
+            dy = 0
+            FILES = []
+            #print(float(self.endTime.year) + float('0.{}'.format(self.endTime.timetuple().tm_yday)))
+            #print(float(self.startTime.year) + float('0.{}'.format((self.startTime + timedelta(days=dy)).timetuple().tm_yday)))
+            while self.endTime >=  (self.startTime + timedelta(days=dy)):
+                # Determine current time
+                ctime = self.startTime + timedelta(days=dy)
+                #print(ctime)
+                for st in self.StationInformation['Name'].tolist():
+                    FILES.extend(glob('{}/*{}.*.{}.{}'.format(self.MSEED_path,st,ctime.year,str(ctime.timetuple().tm_yday).zfill(3))))
+
+                dy += 1 
+
 
         self.FILES = FILES
 
@@ -134,52 +151,49 @@ class MSEED():
 
         self.startTime = datetime.strptime(starttime,'%Y-%m-%dT%H:%M:%S.%f')
         self.endTime      = datetime.strptime(endtime,'%Y-%m-%dT%H:%M:%S.%f')
-
+        self.sampling_rate = sampling_rate
         self._load_fromPath()
 
-        #print('Loading the MSEED')
+        if len(self.FILES) > 0:
+		# Loading the required mseed data
+                c=0
+                for f in self.FILES:
+                  try:
+                    if c==0:
+                      self.st  = obspy.read(f,starttime=UTCDateTime(self.startTime),endtime=UTCDateTime(self.endTime))
+                      c +=1
+                    else:
+                      self.st += obspy.read(f,starttime=UTCDateTime(self.startTime),endtime=UTCDateTime(self.endTime))
+                  except:
+                    continue
+                    print('Station File not MSEED - {}'.format(f))
 
-        # Loading the required mseed data
-        c=0
-        for f in self.FILES:
-          try:
-             if c==0:
-                st = obspy.read(f,starttime=UTCDateTime(self.startTime),endtime=UTCDateTime(self.endTime))
-                c +=1
-             else:
-                st += obspy.read(f,starttime=UTCDateTime(self.startTime),endtime=UTCDateTime(self.endTime))
-          except:
-            continue
-            #print('Station File not MSEED - {}'.format(f))
-
-        # Removing all the stations with gaps
-        if len(st.get_gaps()) > 0:
-            stationRem = np.unique(np.array(st.get_gaps())[:,1]).tolist()
-            for sa in stationRem:
-                tr = st.select(station=sa)
-                for tra in tr:
-
-                    st.remove(tra) 
+                # Removing all the stations with gaps greater than 10.0 milliseconds
+                if len(self.st .get_gaps()) > 0 and np.max(np.array(self.st .get_gaps())[:,4]-np.array(self.st .get_gaps())[:,5] > 10.0) == True:
+                  stationRem = np.unique(np.array(self.st .get_gaps())[:,1]).tolist()
+                  for sa in stationRem:
+                    tr = self.st .select(station=sa)
+                    for tra in tr:
+                      self.st .remove(tra) 
 
 
-        # Combining the mseed and determining station avaliability
-        #print('Detrending and Merging MSEED')
-        #st.detrend()
-        st.merge()
-        
+                # Combining the mseed and determining station avaliability
+
+                self.st.merge(fill_value='interpolate')
+                self.st.detrend('demean')
+                self.st = _downsample(self.st,sampling_rate)
+                
+                signal,stA = self._stationAvaliability(self.st)
+
+        else:
+                print('Data Does not exist for this time period - creating blank')
+                # Files don't exisit so creating zeros ones instead
+                exSamples = (endT-stT).total_seconds()*self.sampling_rate + 1
+                stationAva = np.zeros((len(self.StationInformation['Name']),1))
+                signal     = np.zeros((3,len(self.StationInformation['Name']),int(exSamples)))
 
 
-        
-        # Downsample the mseed to the same level
-        #print('Downsampling MSEED')
-        st = _downsample(st,sampling_rate)
-        self.sampling_rate = sampling_rate
-
-        # Checking the station Avaliability for each of the stations across this time period
-        #print('stationAvaliability MSEED')
-        signal,stA = self._stationAvaliability(st)
-
-
+#        self.st      = None
         self.signal  = signal
         self.FilteredSignal = np.empty((self.signal.shape))
         self.FilteredSignal[:] = np.nan
